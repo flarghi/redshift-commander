@@ -198,7 +198,7 @@ const PreviewSection: React.FC = () => {
           />
         </HStack>
       </CardHeader>
-      <CardBody overflowY="auto" maxH="calc(100vh - 280px)">
+      <CardBody overflowY="auto" px={3} py={3} maxH="calc(100vh - 280px)">
         {!hasRequiredSelections ? (
           <VStack spacing={4} justify="center">
             <Text color="text-muted" textAlign="center">
@@ -212,7 +212,7 @@ const PreviewSection: React.FC = () => {
             </Text>
           </VStack>
         ) : currentPrivileges.length === 0 ? (
-          <VStack spacing={4} justify="center">
+          <VStack spacing={3} justify="center">
             <Text color="text-muted" textAlign="center">
               {hasObjectSelections 
                 ? "Click refresh to load privileges for selected items."
@@ -231,7 +231,7 @@ const PreviewSection: React.FC = () => {
             </Button>
           </VStack>
         ) : (
-          <VStack spacing={4} align="stretch">
+          <VStack spacing={3} align="stretch">
             <InputGroup>
               <InputLeftElement pointerEvents="none">
                 <Icon as={SearchIcon} color="search-icon" />

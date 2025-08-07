@@ -70,13 +70,14 @@ function App() {
               {/* Left-aligned Mode Selector */}
               {isConnected && (
                 <HStack spacing={2} bg="mode-selector-bg" px={3} py={1.5} borderRadius="md">
-                  <Text fontSize="md" fontWeight="bold" color="text-secondary">Mode</Text>
+                  <Text fontSize="md" fontWeight="bold" color="mode-selector-text">Mode</Text>
                   <Select
                     value={action} 
                     onChange={handleActionChange} 
                     size="md" 
                     w="220px"
                     variant="outline"
+                    borderColor="select-border"
                   >
                     <option value="privileges">Table Privileges</option>
                     <option value="default_privileges">Default Privileges</option>

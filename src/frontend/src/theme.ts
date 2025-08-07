@@ -156,6 +156,16 @@ const theme = extendTheme({
         default: 'gray.300',
         _dark: 'gray.500',
       },
+      
+      // Mode selector colors
+      'mode-selector-bg': {
+        default: 'white',
+        _dark: 'gray.900',
+      },
+      'mode-selector-text': {
+        default: 'gray.700',
+        _dark: 'gray.200',
+      },
     },
   },
   styles: {

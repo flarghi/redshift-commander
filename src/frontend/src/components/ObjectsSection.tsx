@@ -223,11 +223,11 @@ const ObjectsSection: React.FC = () => {
                             />
                           )}
                         </Td>
-                        <Td color={isTableAction && object.type === 'schema' ? 'text-disabled' : 'inherit'}>
+                        <Td color={isTableAction && object.type === 'schema' ? 'text-secondary' : 'inherit'}>
                           <DynamicTruncatedText 
                             text={object.name}
                             fontSize="sm"
-                            color={isTableAction && object.type === 'schema' ? 'text-disabled' : 'inherit'}
+                            color={isTableAction && object.type === 'schema' ? 'text-secondary' : 'inherit'}
                           />
                         </Td>
                         <Td>

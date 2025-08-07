@@ -70,9 +70,9 @@ const BottomBar: React.FC<BottomBarProps> = ({ onActionClick, isActionDisabled, 
       bottom={0}
       left={0}
       right={0}
-      bg="white"
+      bg="card-bg"
       borderTop="1px solid"
-      borderColor="gray.200"
+      borderColor="border-primary"
       px={4}
       py={3}
       zIndex={1000}
@@ -92,17 +92,17 @@ const BottomBar: React.FC<BottomBarProps> = ({ onActionClick, isActionDisabled, 
                   variant="ghost"
                   colorScheme="red"
                   onClick={handleReset}
-                  _hover={{ bg: 'red.50', transform: 'scale(1.05)' }}
+                  _hover={{ bg: 'hover-bg', transform: 'scale(1.05)' }}
                   _active={{ transform: 'scale(0.95)' }}
                   borderRadius="full"
                 />
               </Tooltip>
             )}
             <VStack spacing={0} align="start" minW={0}>
-              <Text fontSize="sm" fontWeight="semibold" color="gray.700" isTruncated>
+              <Text fontSize="sm" fontWeight="semibold" color="text-secondary" isTruncated>
                 {getActionLabel()}
               </Text>
-              <Text fontSize="xs" color="gray.500" isTruncated>
+              <Text fontSize="xs" color="text-muted" isTruncated>
                 {getRecapText()}
               </Text>
             </VStack>

@@ -229,16 +229,17 @@ const IdentitiesSection: React.FC<IdentitiesProps> = ({ isTarget = false }) => {
         <VStack spacing={3} align="stretch">
           <InputGroup>
             <InputLeftElement pointerEvents="none">
-              <Icon as={SearchIcon} color="gray.300" />
+              <Icon as={SearchIcon} color="search-icon" />
             </InputLeftElement>
             <Input
               placeholder={`Search ${heading.toLowerCase()}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="sm"
+              borderColor={'input-border'}
             />
           </InputGroup>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="text-muted">
             Showing {paginatedIdentities.length} of {filteredIdentities.length} {heading.toLowerCase()}
             {searchTerm && ` (filtered from ${sourceIdentities.length} total)`}
           </Text>
@@ -359,7 +360,7 @@ const IdentitiesSection: React.FC<IdentitiesProps> = ({ isTarget = false }) => {
               {identityType === 'group' && (
                 <FormControl>
                   <FormLabel>Add Users to Group (Optional)</FormLabel>
-                  <Box maxH="200px" overflowY="auto" border="1px" borderColor="gray.200" borderRadius="md" p={2}>
+                  <Box maxH="200px" overflowY="auto" border="1px" borderColor="border-primary" borderRadius="md" p={2}>
                     <VStack align="stretch" spacing={1}>
                       {identities.filter(u => u.type === 'user').map((user) => (
                         <Checkbox
@@ -376,21 +377,21 @@ const IdentitiesSection: React.FC<IdentitiesProps> = ({ isTarget = false }) => {
                         </Checkbox>
                       ))}
                       {identities.filter(u => u.type === 'user').length === 0 && (
-                        <Text fontSize="sm" color="gray.500" textAlign="center" py={2}>
+                        <Text fontSize="sm" color="text-muted" textAlign="center" py={2}>
                           No users available
                         </Text>
                       )}
                     </VStack>
                   </Box>
-                  <Text fontSize="xs" color="gray.500" mt={1}>
+                  <Text fontSize="xs" color="text-muted" mt={1}>
                     {groupUsers.length} user(s) selected
                   </Text>
                 </FormControl>
               )}
 
-              <Box bg="gray.50" p={3} borderRadius="md" border="1px" borderColor="gray.200">
+              <Box bg="code-bg" p={3} borderRadius="md" border="1px" borderColor="border-primary">
                 <Text fontSize="sm" fontWeight="medium" mb={2}>SQL Command Preview:</Text>
-                <Text fontSize="sm" fontFamily="mono" color="gray.700" whiteSpace="pre-line">
+                <Text fontSize="sm" fontFamily="mono" color="text-code" whiteSpace="pre-line">
                   {identityType === 'user' && identityName && password ?
                     `CREATE USER "${identityName}" WITH PASSWORD '${password.replace(/./g, '*')}'` :
                    identityType === 'group' && identityName ?

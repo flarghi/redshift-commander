@@ -201,10 +201,10 @@ const PreviewSection: React.FC = () => {
       <CardBody overflowY="auto" maxH="calc(100vh - 280px)">
         {!hasRequiredSelections ? (
           <VStack spacing={4} justify="center">
-            <Text color="gray.500" textAlign="center">
+            <Text color="text-muted" textAlign="center">
               Select identities to see current privileges.
             </Text>
-            <Text fontSize="sm" color="gray.400" textAlign="center">
+            <Text fontSize="sm" color="text-secondary" textAlign="center">
               {hasObjectSelections 
                 ? "Click refresh to load privileges for selected objects."
                 : "Click refresh to load all privileges for selected identities."
@@ -213,7 +213,7 @@ const PreviewSection: React.FC = () => {
           </VStack>
         ) : currentPrivileges.length === 0 ? (
           <VStack spacing={4} justify="center">
-            <Text color="gray.500" textAlign="center">
+            <Text color="text-muted" textAlign="center">
               {hasObjectSelections 
                 ? "Click refresh to load privileges for selected items."
                 : "Click refresh to load all privileges for selected identities."
@@ -234,16 +234,17 @@ const PreviewSection: React.FC = () => {
           <VStack spacing={4} align="stretch">
             <InputGroup>
               <InputLeftElement pointerEvents="none">
-                <Icon as={SearchIcon} color="gray.300" />
+                <Icon as={SearchIcon} color="search-icon" />
               </InputLeftElement>
               <Input
                 placeholder="Search privileges..."
                 value={privilegesSearchTerm}
                 onChange={(e) => setPrivilegesSearchTerm(e.target.value)}
                 size="sm"
+                borderColor={'input-border'}
               />
             </InputGroup>
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="text-muted">
               Showing {paginatedPrivileges.length} of {filteredPrivileges.length} privilege entries
               {privilegesSearchTerm && ` (filtered from ${currentPrivileges.length} total)`}
             </Text>

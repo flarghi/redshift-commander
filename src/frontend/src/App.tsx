@@ -12,10 +12,12 @@ import {
   Button,
   Select,
   IconButton,
+  Divider,
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 import MainInterface from './components/MainInterface';
 import ConnectionForm from './components/ConnectionForm';
+import { ThemeToggle } from './components/ThemeToggle';
 import useStore from './store/store';
 import type { ActionType } from './types';
 import logo from './assets/logo-2.png';
@@ -54,7 +56,7 @@ function App() {
   }
 
   return (
-    <Container maxW="99vw" py={4} px={2} minH="100vh">
+    <Container maxW="99vw" py={4} px={2} minH="100vh" bg="app-bg">
       <Box mb={6}>
         <Box minH="60px" mb={3} overflow="hidden">
           <HStack justify="space-between" align="center" spacing={4} w="full">
@@ -63,17 +65,14 @@ function App() {
               
               {/* Left-aligned Mode Selector */}
               {isConnected && (
-                <HStack spacing={2} bg="gray.50" px={3} py={1.5} borderRadius="md" border="1px solid" borderColor="gray.300">
-                  <Text fontSize="md" fontWeight="bold" color="gray.700">Mode</Text>
-                  <Select 
+                <HStack spacing={2} bg="mode-selector-bg" px={3} py={1.5} borderRadius="md">
+                  <Text fontSize="md" fontWeight="bold" color="text-secondary">Mode</Text>
+                  <Select
                     value={action} 
                     onChange={handleActionChange} 
                     size="md" 
                     w="220px"
-                    bg="white"
-                    borderColor="gray.400"
-                    _hover={{ borderColor: "gray.500" }}
-                    _focus={{ borderColor: "gray.600", boxShadow: "0 0 0 1px gray.600" }}
+                    variant="outline"
                   >
                     <option value="privileges">Table Privileges</option>
                     <option value="default_privileges">Default Privileges</option>
@@ -86,13 +85,14 @@ function App() {
             </HStack>
 
             <HStack spacing={3} flexShrink={0}>
+              <ThemeToggle />
               <Badge colorScheme={isConnected ? 'green' : 'red'} size="lg" flexShrink={0}>
                 {isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
               {connectionConfig && showConnectionString && (
                 <Text 
                   fontSize="sm" 
-                  color="gray.600" 
+                  color="text-connection"
                   isTruncated 
                   maxW="calc(100vw - 800px)"
                   minW={0}
@@ -119,7 +119,7 @@ function App() {
             </HStack>
           </HStack>
         </Box>
-        <hr/>
+        <Divider borderColor="divider" />
         {!isConnected && (
           <Alert status="info" mb={6}>
             <AlertIcon />

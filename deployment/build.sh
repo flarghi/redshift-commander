@@ -34,6 +34,7 @@ docker buildx build \
     --platform linux/amd64,linux/arm64 \
     --tag "${FULL_IMAGE_NAME}:${TAG}" \
     --tag "${FULL_IMAGE_NAME}:latest" \
+    --load \
     --push \
     .
 

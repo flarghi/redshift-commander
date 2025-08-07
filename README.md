@@ -31,10 +31,10 @@ A single-container full-stack webapp for managing Amazon Redshift database permi
 
 ```bash
 docker pull flarghi/redshift-commander
-docker run -p 3000:3000 flarghi/redshift-commander
+docker run -p 80:80 flarghi/redshift-commander
 
 # Access the application
-open http://localhost:3000
+open http://localhost:80
 ```
 
 ### Production Build
@@ -47,7 +47,7 @@ npm run build
 npm start
 
 # Access the application
-open http://localhost:3000
+open http://localhost:80
 ```
 
 ## Usage
@@ -116,7 +116,7 @@ npm start                     # Production server
 ### Container Deployment
 ```bash
 docker build -t redshift-commander .
-docker run -p 3000:3000 redshift-commander
+docker run -p 80:80 redshift-commander
 ```
 
 Deploy to any container platform: AWS ECS/Fargate, Google Cloud Run, Azure Container Instances, Kubernetes.

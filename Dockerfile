@@ -38,7 +38,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 
-EXPOSE 3000
+EXPOSE 80
 
 # Run the server
 CMD ["npm", "start"]

@@ -96,11 +96,11 @@ const theme = extendTheme({
       // Code and preview
       'code-bg': {
         default: 'gray.50',
-        _dark: 'gray.700',
+        _dark: 'gray.900',
       },
       'code-border': {
         default: 'gray.200',
-        _dark: 'gray.600',
+        _dark: 'gray.700',
       },
       
       // Icons and interactive elements

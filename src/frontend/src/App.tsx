@@ -13,6 +13,7 @@ import {
   Select,
   IconButton,
   Divider,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 import MainInterface from './components/MainInterface';
@@ -20,7 +21,8 @@ import ConnectionForm from './components/ConnectionForm';
 import { ThemeToggle } from './components/ThemeToggle';
 import useStore from './store/store';
 import type { ActionType } from './types';
-import logo from './assets/logo-2.png';
+import logoLight from './assets/logo-light.png';
+import logoDark from './assets/logo-dark.png';
 
 function App() {
   const {
@@ -35,6 +37,8 @@ function App() {
     showConnectionString,
     toggleConnectionStringVisibility,
   } = useStore();
+
+  const logo = useColorModeValue(logoLight, logoDark);
 
   useEffect(() => {
     checkConnectionStatus();

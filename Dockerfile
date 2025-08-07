@@ -25,6 +25,7 @@ WORKDIR /app
 
 # Set the environment to production for performance and security
 ENV NODE_ENV=production
+ENV PORT=80
 
 # Copy only the package files needed to install production server dependencies
 COPY package.json package-lock.json* ./

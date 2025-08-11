@@ -45,55 +45,60 @@ const ConnectionForm: React.FC = () => {
     <Box maxW="md" mx="auto">
       <Card>
         <CardHeader>
-          <Heading size="md">Connect to Redshift</Heading>
+          <Heading size="md" color="text-primary">Connect to Redshift</Heading>
         </CardHeader>
         <CardBody>
           <VStack spacing={4}>
             <FormControl isRequired>
-              <FormLabel>Host</FormLabel>
+              <FormLabel color="text-secondary">Host</FormLabel>
               <Input
                 type="text"
                 value={formData.host}
                 onChange={handleInputChange('host')}
                 placeholder="your-cluster.region.redshift.amazonaws.com"
+                variant="outline"
               />
             </FormControl>
 
             <FormControl isRequired>
-              <FormLabel>Port</FormLabel>
+              <FormLabel color="text-secondary">Port</FormLabel>
               <Input
                 type="number"
                 value={formData.port}
                 onChange={handleInputChange('port')}
+                variant="outline"
               />
             </FormControl>
 
             <FormControl isRequired>
-              <FormLabel>Database</FormLabel>
+              <FormLabel color="text-secondary">Database</FormLabel>
               <Input
                 type="text"
                 value={formData.database}
                 onChange={handleInputChange('database')}
                 placeholder="dev"
+                variant="outline"
               />
             </FormControl>
 
             <FormControl isRequired>
-              <FormLabel>Username</FormLabel>
+              <FormLabel color="text-secondary">Username</FormLabel>
               <Input
                 type="text"
                 value={formData.username}
                 onChange={handleInputChange('username')}
                 placeholder="admin"
+                variant="outline"
               />
             </FormControl>
 
             <FormControl isRequired>
-              <FormLabel>Password</FormLabel>
+              <FormLabel color="text-secondary">Password</FormLabel>
               <Input
                 type="password"
                 value={formData.password}
                 onChange={handleInputChange('password')}
+                variant="outline"
               />
             </FormControl>
 

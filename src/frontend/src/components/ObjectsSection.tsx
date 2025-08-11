@@ -127,16 +127,17 @@ const ObjectsSection: React.FC = () => {
         <VStack spacing={3} align="stretch">
           <InputGroup>
             <InputLeftElement pointerEvents="none">
-              <Icon as={SearchIcon} color="gray.300" />
+              <Icon as={SearchIcon} color="search-icon" />
             </InputLeftElement>
             <Input
               placeholder={`Search ${heading.toLowerCase()}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="sm"
+              borderColor={'input-border'}
             />
           </InputGroup>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="text-muted">
             Showing {paginatedObjects.length} of {filteredObjects.length} {heading.toLowerCase()}
             {searchTerm && ` (filtered from ${objects.length} total)`}
           </Text>
@@ -200,8 +201,8 @@ const ObjectsSection: React.FC = () => {
                                 as={expandedSchemas.has(object.name) ? ChevronDownIcon : ChevronRightIcon}
                                 onClick={() => toggleSchema(object.name)}
                                 cursor="pointer"
-                                color="gray.500"
-                                _hover={{ color: 'gray.700' }}
+                                color="expand-icon"
+                                _hover={{ color: "expand-icon-hover" }}
                               />
                               {isTableAction && (
                                 <Checkbox
@@ -222,11 +223,11 @@ const ObjectsSection: React.FC = () => {
                             />
                           )}
                         </Td>
-                        <Td color={isTableAction && object.type === 'schema' ? 'gray.500' : 'inherit'}>
+                        <Td color={isTableAction && object.type === 'schema' ? 'text-secondary' : 'inherit'}>
                           <DynamicTruncatedText 
                             text={object.name}
                             fontSize="sm"
-                            color={isTableAction && object.type === 'schema' ? 'gray.500' : 'inherit'}
+                            color={isTableAction && object.type === 'schema' ? 'text-secondary' : 'inherit'}
                           />
                         </Td>
                         <Td>
@@ -243,7 +244,7 @@ const ObjectsSection: React.FC = () => {
                           const isChildDisabled = isAllTablesSelected && (child.type === 'table' || child.type === 'view');
                           
                           return (
-                          <Tr key={`${object.name}-${child.name}`} bg={isChildDisabled ? "gray.100" : "gray.25"} opacity={isChildDisabled ? 0.6 : 1}>
+                          <Tr key={`${object.name}-${child.name}`} bg={isChildDisabled ? "disabled-row-bg" : "child-row-bg"} opacity={isChildDisabled ? 0.6 : 1}>
                             <Td pl={12}>
                               <Checkbox
                                 size="sm"

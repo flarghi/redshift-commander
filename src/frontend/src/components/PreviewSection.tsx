@@ -198,13 +198,13 @@ const PreviewSection: React.FC = () => {
           />
         </HStack>
       </CardHeader>
-      <CardBody overflowY="auto" maxH="calc(100vh - 280px)">
+      <CardBody overflowY="auto" px={3} py={3} maxH="calc(100vh - 280px)">
         {!hasRequiredSelections ? (
           <VStack spacing={4} justify="center">
-            <Text color="gray.500" textAlign="center">
+            <Text color="text-muted" textAlign="center">
               Select identities to see current privileges.
             </Text>
-            <Text fontSize="sm" color="gray.400" textAlign="center">
+            <Text fontSize="sm" color="text-secondary" textAlign="center">
               {hasObjectSelections 
                 ? "Click refresh to load privileges for selected objects."
                 : "Click refresh to load all privileges for selected identities."
@@ -212,8 +212,8 @@ const PreviewSection: React.FC = () => {
             </Text>
           </VStack>
         ) : currentPrivileges.length === 0 ? (
-          <VStack spacing={4} justify="center">
-            <Text color="gray.500" textAlign="center">
+          <VStack spacing={3} justify="center">
+            <Text color="text-muted" textAlign="center">
               {hasObjectSelections 
                 ? "Click refresh to load privileges for selected items."
                 : "Click refresh to load all privileges for selected identities."
@@ -231,19 +231,20 @@ const PreviewSection: React.FC = () => {
             </Button>
           </VStack>
         ) : (
-          <VStack spacing={4} align="stretch">
+          <VStack spacing={3} align="stretch">
             <InputGroup>
               <InputLeftElement pointerEvents="none">
-                <Icon as={SearchIcon} color="gray.300" />
+                <Icon as={SearchIcon} color="search-icon" />
               </InputLeftElement>
               <Input
                 placeholder="Search privileges..."
                 value={privilegesSearchTerm}
                 onChange={(e) => setPrivilegesSearchTerm(e.target.value)}
                 size="sm"
+                borderColor={'input-border'}
               />
             </InputGroup>
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="text-muted">
               Showing {paginatedPrivileges.length} of {filteredPrivileges.length} privilege entries
               {privilegesSearchTerm && ` (filtered from ${currentPrivileges.length} total)`}
             </Text>

@@ -171,7 +171,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ isOpen, onClose }) => {
               <Text fontWeight="semibold">The following SQL statements will be executed:</Text>
               <Box maxH="400px" overflowY="auto">
                 {(isExecuteDisabled && !isRoleAction) ? (
-                  <Text fontSize="sm" color="gray.500" fontStyle="italic" p={2}>
+                  <Text fontSize="sm" color="text-muted" fontStyle="italic" p={2}>
                     Select at least one privilege to see the SQL preview
                   </Text>
                 ) : (
@@ -187,9 +187,9 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ isOpen, onClose }) => {
           <ButtonGroup>
             <Button
               variant="solid"
-              bg="gray.200"
-              color="gray.700"
-              _hover={{ bg: 'gray.300' }}
+              bg="neutral-button"
+              color="neutral-button-text"
+              _hover={{ bg: 'neutral-button-hover' }}
               onClick={handleClose}
             >
               Cancel

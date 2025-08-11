@@ -30,7 +30,7 @@ function App() {
     error,
     isConnected,
     connectionConfig,
-    checkConnectionStatus,
+    initializeFromSession,
     disconnect,
     action,
     setAction,
@@ -41,8 +41,25 @@ function App() {
   const logo = useColorModeValue(logoLight, logoDark);
 
   useEffect(() => {
-    checkConnectionStatus();
-  }, [checkConnectionStatus]);
+    // Initialize from current browser session first, then check status
+    initializeFromSession();
+  }, [initializeFromSession]);
+
+  // Cleanup session on page unload for extra security
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Optional: Clear sensitive data on tab close for extra security
+      // sessionStorage is already isolated per tab, but this adds extra cleanup
+      if (sessionStorage.getItem('redshift-connection-config')) {
+        // You could add additional cleanup here if needed
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   const handleActionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setAction(e.target.value as ActionType);

@@ -21,6 +21,7 @@ import {
   generatePreview,
   runQuery,
 } from '../api';
+import { sessionUtils } from '../utils/sessionUtils';
 
 interface AppState {
   // Connection State
@@ -52,6 +53,7 @@ interface AppState {
   privilegesSearchTerm: string;
 
   // Actions
+  initializeFromSession: () => Promise<void>;
   checkConnectionStatus: () => Promise<void>;
   connect: (config: RedshiftConnection) => Promise<void>;
   disconnect: () => Promise<void>;
@@ -107,6 +109,22 @@ const useStore = create<AppState>((set, get) => ({
   privilegesSearchTerm: '',
 
   // Actions
+  initializeFromSession: async () => {
+    try {
+      // Load connection config from current browser session only
+      const savedConfig = sessionUtils.getConnectionConfig();
+      if (savedConfig && sessionUtils.isValidSession()) {
+        set({ connectionConfig: savedConfig });
+        // Try to reconnect with saved config
+        await get().connect(savedConfig);
+      }
+    } catch (error) {
+      console.warn('Failed to initialize from session:', error);
+      // Clear invalid session data
+      sessionUtils.clearSession();
+    }
+  },
+
   checkConnectionStatus: async () => {
     try {
       const response = await connectionApi.status();
@@ -115,9 +133,12 @@ const useStore = create<AppState>((set, get) => ({
         get().fetchInitialData();
       } else {
         set({ isConnected: false, connectionConfig: null });
+        // Clear session storage if server says not connected
+        sessionUtils.clearSession();
       }
     } catch {
       set({ isConnected: false, connectionConfig: null });
+      sessionUtils.clearSession();
     }
   },
 
@@ -127,18 +148,24 @@ const useStore = create<AppState>((set, get) => ({
       const response = await connectionApi.connect(config);
       if (response.success) {
         set({ isConnected: true, isConnecting: false, connectionConfig: config });
+        // Save to sessionStorage for this browser session only
+        sessionUtils.setConnectionConfig(config);
         get().fetchInitialData();
       } else {
         set({ isConnected: false, isConnecting: false, connectionError: response.error });
+        sessionUtils.clearSession();
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
       set({ isConnected: false, isConnecting: false, connectionError: errorMessage });
+      sessionUtils.clearSession();
     }
   },
 
   disconnect: async () => {
     await connectionApi.disconnect();
+    // Clear session storage on disconnect
+    sessionUtils.clearSession();
     set({
       isConnected: false,
       connectionConfig: null,

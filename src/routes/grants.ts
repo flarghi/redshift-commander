@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { getConnectionBySessionId } from './connect';
 import { GrantRequest, ApiResponse } from '../types';
+import { validateBody } from '../utils/validationMiddleware';
+import { GrantRevokeSchema, PreviewGrantRevokeSchema } from '../utils/validationSchemas';
 
 export const grantsRoutes = Router();
 
@@ -122,8 +124,9 @@ const generateGrantSQL = (request: GrantRequest): string[] => {
   return statements;
 };
 
-grantsRoutes.post('/preview', requireConnection, async (req, res) => {
+grantsRoutes.post('/preview', validateBody(PreviewGrantRevokeSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const request: GrantRequest = req.body;
     const statements = generateGrantSQL(request);
     
@@ -141,8 +144,9 @@ grantsRoutes.post('/preview', requireConnection, async (req, res) => {
   }
 });
 
-grantsRoutes.post('/execute', requireConnection, async (req, res) => {
+grantsRoutes.post('/execute', validateBody(GrantRevokeSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const request: GrantRequest = req.body;
     console.log('Grant request received:', request);
     

@@ -2,14 +2,17 @@ import { Router } from 'express';
 import { Pool } from 'pg';
 import { RedshiftConnection, ApiResponse } from '../types';
 import { serverSessionManager } from '../utils/serverSessionManager';
+import { validateBody, validateQuery } from '../utils/validationMiddleware';
+import { ConnectionConfigSchema, SessionIdSchema } from '../utils/validationSchemas';
 
 export const connectRoutes = Router();
 
 // Store connection pools by session ID
 const connectionPools = new Map<string, Pool>();
 
-connectRoutes.post('/test', async (req, res) => {
+connectRoutes.post('/test', validateBody(ConnectionConfigSchema), async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const config: RedshiftConnection = req.body;
     
     console.log('Testing connection to:', {
@@ -59,8 +62,9 @@ connectRoutes.post('/test', async (req, res) => {
   }
 });
 
-connectRoutes.post('/', async (req, res) => {
+connectRoutes.post('/', validateBody(ConnectionConfigSchema), async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const config: RedshiftConnection = req.body;
     
     console.log('Connecting to Redshift:', {
@@ -70,14 +74,6 @@ connectRoutes.post('/', async (req, res) => {
       username: config.username,
       ssl: config.ssl
     });
-    
-    // Validate required fields
-    if (!config.host || !config.database || !config.username || !config.password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required connection parameters'
-      } as ApiResponse);
-    }
 
     // Create connection pool
     const pool = new Pool({
@@ -137,18 +133,9 @@ connectRoutes.post('/', async (req, res) => {
   }
 });
 
-connectRoutes.get('/status', (req, res) => {
-  const { sessionId } = req.query;
-
-  if (!sessionId || typeof sessionId !== 'string') {
-    return res.json({
-      success: true,
-      data: {
-        connected: false,
-        config: null
-      }
-    } as ApiResponse);
-  }
+connectRoutes.get('/status', validateQuery(SessionIdSchema), (req, res) => {
+  // Query is now validated and typed by Zod
+  const { sessionId } = req.query as { sessionId: string };
 
   const session = serverSessionManager.getSession(sessionId);
   const pool = connectionPools.get(sessionId);
@@ -173,16 +160,10 @@ connectRoutes.get('/status', (req, res) => {
   res.json(response);
 });
 
-connectRoutes.delete('/', async (req, res) => {
+connectRoutes.delete('/', validateQuery(SessionIdSchema), async (req, res) => {
   try {
-    const { sessionId } = req.query;
-
-    if (!sessionId || typeof sessionId !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'Session ID required'
-      } as ApiResponse);
-    }
+    // Query is now validated and typed by Zod
+    const { sessionId } = req.query as { sessionId: string };
 
     console.log(`Attempting to disconnect session: ${sessionId.substring(0, 8)}...`);
     

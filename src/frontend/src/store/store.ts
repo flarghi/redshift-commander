@@ -344,6 +344,10 @@ const useStore = create<AppState>((set, get) => ({
     const { action, grantOrRevoke, selectedIdentities, selectedObjects, selectedTargetIdentities, permissions, allTablesSelection } = get();
     set({ isLoading: true, error: null });
 
+    console.log('[Frontend] generatePreview called');
+    console.log('[Frontend] permissions:', permissions);
+    console.log('[Frontend] permissions length:', permissions?.length);
+
     // Construct the full action string
     let fullAction: string;
     if (action === 'privileges') {
@@ -373,12 +377,22 @@ const useStore = create<AppState>((set, get) => ({
         } as GrantableObject);
       });
       
+      console.log('[Frontend] Calling API with payload:', {
+        action: fullAction,
+        identities: selectedIdentities,
+        objects: objectsForPreview,
+        targets: selectedTargetIdentities,
+        permissions: permissions,
+      });
+
       const sql = await generatePreview(fullAction, {
         identities: selectedIdentities,
         objects: objectsForPreview,
         targets: selectedTargetIdentities,
         permissions: permissions,
       });
+      
+      console.log('[Frontend] Received SQL:', sql);
       set({ previewSql: sql, isLoading: false });
     } catch {
       set({ error: 'Failed to generate preview.', isLoading: false });

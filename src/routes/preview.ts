@@ -9,6 +9,8 @@ import {
   validatePrivileges,
   validateAction
 } from '../utils/sqlUtils';
+import { validateBody } from '../utils/validationMiddleware';
+import { ExecuteSQLSchema } from '../utils/validationSchemas';
 
 export const previewRoutes = Router();
 
@@ -692,26 +694,12 @@ previewRoutes.post('/permissions-filtered', requireConnection, async (req, res) 
 });
 
 // Execute SQL query endpoint - MUST be before /:action route
-previewRoutes.post('/run', requireConnection, async (req, res) => {
+previewRoutes.post('/run', validateBody(ExecuteSQLSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
+    // Only GRANT and REVOKE statements are allowed
     console.log('Execute endpoint called with body:', req.body);
     const { sql } = req.body;
-
-    if (!sql || typeof sql !== 'string') {
-      console.log('No SQL provided in request body or SQL is not a string');
-      return res.status(400).json({
-        success: false,
-        error: 'SQL query is required and must be a string'
-      });
-    }
-
-    if (sql.trim() === '') {
-      console.log('Empty SQL string provided');
-      return res.status(400).json({
-        success: false,
-        error: 'SQL query cannot be empty'
-      });
-    }
 
     console.log(`Executing SQL:`, sql);
 
@@ -795,7 +783,9 @@ previewRoutes.post('/:action', requireConnection, async (req, res) => {
     const { identities, objects, targets, permissions } = req.body;
 
     console.log(`Generating SQL preview for action: ${action}`);
-    console.log(`Request body:`, req.body);
+    console.log(`Request body:`, JSON.stringify(req.body, null, 2));
+    console.log(`Permissions array:`, permissions);
+    console.log(`Permissions length:`, permissions?.length);
 
     // Get current database name for database operations
     let currentDatabaseName = '';
@@ -855,11 +845,17 @@ previewRoutes.post('/:action', requireConnection, async (req, res) => {
 
     res.json({ sql });
   } catch (error) {
+    // Check if it's a validation error (400) vs server error (500)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate SQL preview';
+    const isValidationError = errorMessage.includes('privilege') || 
+                              errorMessage.includes('Invalid identifier') ||
+                              errorMessage.includes('must be specified');
+    
     const response: ApiResponse = {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate SQL preview'
+      error: errorMessage
     };
-    res.status(500).json(response);
+    res.status(isValidationError ? 400 : 500).json(response);
   }
 });
 
@@ -881,14 +877,16 @@ function generateGrantSQL(identities: any[], objects: any[], permissions: any[])
       
       // Validate privileges
       const privValues = permissions.map((p: any) => p.value);
-      const validPrivs = validatePrivileges(privValues, object.type || 'table');
-      const privs = validPrivs.join(', ');
       
-      // Handle ALL tables in schema
+      // Handle ALL tables in schema - requires table privileges, not schema privileges
       if (object.isAllTables && object.type === 'schema') {
+        const validPrivs = validatePrivileges(privValues, 'table'); // Use 'table' for ALL TABLES
+        const privs = validPrivs.join(', ');
         const quotedSchema = quoteIdentifier(object.name);
         statements.push(`GRANT ${privs} ON ALL TABLES IN SCHEMA ${quotedSchema} TO ${quotedIdentity};`);
       } else {
+        const validPrivs = validatePrivileges(privValues, object.type || 'table');
+        const privs = validPrivs.join(', ');
         const objectType = (object.type === 'table' || object.type === 'view') ? 'TABLE' : 'SCHEMA';
         const objectRef = object.schema 
           ? buildSchemaTable(object.schema, object.name)
@@ -918,14 +916,16 @@ function generateRevokeSQL(identities: any[], objects: any[], permissions: any[]
       
       // Validate privileges
       const privValues = permissions.map((p: any) => p.value);
-      const validPrivs = validatePrivileges(privValues, object.type || 'table');
-      const privs = validPrivs.join(', ');
       
-      // Handle ALL tables in schema
+      // Handle ALL tables in schema - requires table privileges, not schema privileges
       if (object.isAllTables && object.type === 'schema') {
+        const validPrivs = validatePrivileges(privValues, 'table'); // Use 'table' for ALL TABLES
+        const privs = validPrivs.join(', ');
         const quotedSchema = quoteIdentifier(object.name);
         statements.push(`REVOKE ${privs} ON ALL TABLES IN SCHEMA ${quotedSchema} FROM ${quotedIdentity};`);
       } else {
+        const validPrivs = validatePrivileges(privValues, object.type || 'table');
+        const privs = validPrivs.join(', ');
         const objectType = (object.type === 'table' || object.type === 'view') ? 'TABLE' : 'SCHEMA';
         const objectRef = object.schema 
           ? buildSchemaTable(object.schema, object.name)

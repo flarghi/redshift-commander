@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { getConnectionBySessionId } from './connect';
 import { User, ApiResponse } from '../types';
-import { quoteIdentifier, validateIdentifier, escapeLiteral } from '../utils/sqlUtils';
+import { quoteIdentifier, escapeLiteral } from '../utils/sqlUtils';
+import { validateBody } from '../utils/validationMiddleware';
+import { CreateUserSchema, CreateGroupSchema, CreateRoleSchema } from '../utils/validationSchemas';
 
 export const usersRoutes = Router();
 
@@ -106,28 +108,11 @@ usersRoutes.get('/', requireConnection, async (req, res) => {
   }
 });
 
-// Create User endpoint
-usersRoutes.post('/create-user', requireConnection, async (req, res) => {
+// Create User endpoint with Zod validation
+usersRoutes.post('/create-user', validateBody(CreateUserSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username and password are required'
-      });
-    }
-
-    // Validate input - return 400 for validation errors (bad request)
-    try {
-      validateIdentifier(username, 'username');
-    } catch (validationError) {
-      console.log('Validation failed for username:', username);
-      return res.status(400).json({
-        success: false,
-        error: validationError instanceof Error ? validationError.message : 'Invalid username'
-      });
-    }
 
     const client = await (req as any).connection.connect();
     
@@ -157,33 +142,11 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
   }
 });
 
-// Create Group endpoint
-usersRoutes.post('/create-group', requireConnection, async (req, res) => {
+// Create Group endpoint with Zod validation
+usersRoutes.post('/create-group', validateBody(CreateGroupSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const { groupname, users = [] } = req.body;
-    
-    if (!groupname) {
-      return res.status(400).json({
-        success: false,
-        error: 'Group name is required'
-      });
-    }
-
-    // Validate input - return 400 for validation errors (bad request)
-    try {
-      validateIdentifier(groupname, 'group name');
-      
-      // Validate all user names
-      for (const user of users) {
-        validateIdentifier(user, 'user name');
-      }
-    } catch (validationError) {
-      console.log('Validation failed for group:', groupname);
-      return res.status(400).json({
-        success: false,
-        error: validationError instanceof Error ? validationError.message : 'Invalid group or user name'
-      });
-    }
 
     const client = await (req as any).connection.connect();
     
@@ -223,28 +186,11 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
   }
 });
 
-// Create Role endpoint
-usersRoutes.post('/create-role', requireConnection, async (req, res) => {
+// Create Role endpoint with Zod validation
+usersRoutes.post('/create-role', validateBody(CreateRoleSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const { rolename } = req.body;
-    
-    if (!rolename) {
-      return res.status(400).json({
-        success: false,
-        error: 'Role name is required'
-      });
-    }
-
-    // Validate input - return 400 for validation errors (bad request)
-    try {
-      validateIdentifier(rolename, 'role name');
-    } catch (validationError) {
-      console.log('Validation failed for role:', rolename);
-      return res.status(400).json({
-        success: false,
-        error: validationError instanceof Error ? validationError.message : 'Invalid role name'
-      });
-    }
 
     const client = await (req as any).connection.connect();
     

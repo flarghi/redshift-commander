@@ -28,7 +28,8 @@ interface AppState {
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
-  connectionConfig: RedshiftConnection | null;
+  sessionId: string | null;
+  connectionInfo: { host: string; database: string; username: string; port: number } | null;
   showConnectionString: boolean;
 
   // App State
@@ -86,7 +87,8 @@ const useStore = create<AppState>((set, get) => ({
   isConnected: false,
   isConnecting: false,
   connectionError: null,
-  connectionConfig: null,
+  sessionId: sessionUtils.getSessionId(),
+  connectionInfo: null,
   showConnectionString: true,
   action: 'privileges',
   grantOrRevoke: 'grant',
@@ -111,12 +113,11 @@ const useStore = create<AppState>((set, get) => ({
   // Actions
   initializeFromSession: async () => {
     try {
-      // Load connection config from current browser session only
-      const savedConfig = sessionUtils.getConnectionConfig();
-      if (savedConfig && sessionUtils.isValidSession()) {
-        set({ connectionConfig: savedConfig });
-        // Try to reconnect with saved config
-        await get().connect(savedConfig);
+      // Check if we have a session ID
+      const savedSessionId = sessionUtils.getSessionId();
+      if (savedSessionId) {
+        // Check if session is still valid on server
+        await get().checkConnectionStatus();
       }
     } catch (error) {
       console.warn('Failed to initialize from session:', error);
@@ -127,17 +128,27 @@ const useStore = create<AppState>((set, get) => ({
 
   checkConnectionStatus: async () => {
     try {
-      const response = await connectionApi.status();
+      const sessionId = get().sessionId;
+      if (!sessionId) {
+        set({ isConnected: false, sessionId: null, connectionInfo: null });
+        return;
+      }
+
+      const response = await connectionApi.status(sessionId);
       if (response.success && response.data?.connected) {
-        set({ isConnected: true, connectionConfig: response.data.config });
+        set({ 
+          isConnected: true, 
+          sessionId,
+          connectionInfo: response.data.config 
+        });
         get().fetchInitialData();
       } else {
-        set({ isConnected: false, connectionConfig: null });
+        set({ isConnected: false, sessionId: null, connectionInfo: null });
         // Clear session storage if server says not connected
         sessionUtils.clearSession();
       }
     } catch {
-      set({ isConnected: false, connectionConfig: null });
+      set({ isConnected: false, sessionId: null, connectionInfo: null });
       sessionUtils.clearSession();
     }
   },
@@ -146,10 +157,24 @@ const useStore = create<AppState>((set, get) => ({
     set({ isConnecting: true, connectionError: null });
     try {
       const response = await connectionApi.connect(config);
-      if (response.success) {
-        set({ isConnected: true, isConnecting: false, connectionConfig: config });
-        // Save to sessionStorage for this browser session only
-        sessionUtils.setConnectionConfig(config);
+      if (response.success && response.data?.sessionId) {
+        const { sessionId, connectionInfo } = response.data;
+        
+        // Store session ID in browser storage (NO credentials)
+        sessionUtils.setSessionId(sessionId);
+        
+        set({ 
+          isConnected: true, 
+          isConnecting: false,
+          sessionId,
+          connectionInfo: connectionInfo || {
+            host: config.host,
+            database: config.database,
+            username: config.username,
+            port: config.port
+          }
+        });
+        
         get().fetchInitialData();
       } else {
         set({ isConnected: false, isConnecting: false, connectionError: response.error });
@@ -163,12 +188,17 @@ const useStore = create<AppState>((set, get) => ({
   },
 
   disconnect: async () => {
-    await connectionApi.disconnect();
+    const sessionId = get().sessionId;
+    if (sessionId) {
+      await connectionApi.disconnect(sessionId);
+    }
+    
     // Clear session storage on disconnect
     sessionUtils.clearSession();
     set({
       isConnected: false,
-      connectionConfig: null,
+      sessionId: null,
+      connectionInfo: null,
       identities: [],
       objects: [],
       selectedIdentities: [],

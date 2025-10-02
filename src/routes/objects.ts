@@ -1,22 +1,34 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { DatabaseObject, ApiResponse } from '../types';
 
 export const objectsRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
-  if (!currentConnection) {
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
+  req.connection = connection;
   next();
 };
 
 objectsRoutes.get('/schemas', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const query = `
       SELECT 
@@ -54,7 +66,7 @@ objectsRoutes.get('/schemas', requireConnection, async (req, res) => {
 objectsRoutes.get('/tables/:schema', requireConnection, async (req, res) => {
   try {
     const { schema } = req.params;
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const query = `
       SELECT 
@@ -97,7 +109,7 @@ objectsRoutes.get('/tables/:schema', requireConnection, async (req, res) => {
 objectsRoutes.get('/functions/:schema', requireConnection, async (req, res) => {
   try {
     const { schema } = req.params;
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const query = `
       SELECT 
@@ -135,7 +147,7 @@ objectsRoutes.get('/functions/:schema', requireConnection, async (req, res) => {
 // Fast endpoint to get only schema names (for initial load)
 objectsRoutes.get('/schemas-only', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const query = `
       SELECT 
@@ -173,7 +185,7 @@ objectsRoutes.get('/schemas-only', requireConnection, async (req, res) => {
 
 objectsRoutes.get('/roles', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const query = `
       SELECT 
@@ -210,7 +222,7 @@ objectsRoutes.get('/roles', requireConnection, async (req, res) => {
 
 objectsRoutes.get('/hierarchy', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Check for limit parameter to avoid loading too many objects
     const limit = parseInt(req.query.limit as string) || 1000; // Default limit of 1000 objects per schema

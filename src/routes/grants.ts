@@ -1,16 +1,28 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { GrantRequest, ApiResponse } from '../types';
 
 export const grantsRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
-  if (!currentConnection) {
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
+  req.connection = connection;
   next();
 };
 
@@ -137,7 +149,7 @@ grantsRoutes.post('/execute', requireConnection, async (req, res) => {
     const statements = generateGrantSQL(request);
     console.log('Generated SQL statements:', statements);
     
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     const results: string[] = [];
     const errors: string[] = [];
     

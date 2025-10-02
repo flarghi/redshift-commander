@@ -1,22 +1,34 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { Permission, ApiResponse } from '../types';
 
 export const permissionsRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
-  if (!currentConnection) {
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
+  req.connection = connection;
   next();
 };
 
 permissionsRoutes.get('/', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Try svv_relation_privileges first, fallback to information_schema if it doesn't exist
     let query = `
@@ -87,7 +99,7 @@ permissionsRoutes.get('/', requireConnection, async (req, res) => {
 permissionsRoutes.get('/object/:schema/:objectName', requireConnection, async (req, res) => {
   try {
     const { schema, objectName } = req.params;
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     let query = `
       SELECT 

@@ -1,19 +1,32 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { ApiResponse } from '../types';
 
 export const previewRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
   console.log('Checking database connection...');
-  if (!currentConnection) {
-    console.log('No database connection established');
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
+    console.log('No session ID provided');
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    console.log('Invalid or expired session');
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
   console.log('Database connection exists');
+  req.connection = connection;
   next();
 };
 
@@ -46,7 +59,7 @@ previewRoutes.get('/permissions/:identityName/:objectType/:schemaName/:objectNam
       objectName: trimmedObjectName
     });
     
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Use SHOW GRANTS FOR query to get privileges for the specific identity
     // Note: For this endpoint, we don't have identity type info, so we'll try both formats
@@ -170,7 +183,7 @@ previewRoutes.get('/permissions-summary/:identityName', requireConnection, async
     
     console.log(`SHOW GRANTS summary for identity: ${trimmedIdentityName}`);
     
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Get current database name for database privileges filtering
     let currentDatabaseName = '';
@@ -302,7 +315,7 @@ previewRoutes.get('/role-grants/:identityName/:roleName', requireConnection, asy
     
     console.log(`SVV role check for identity: ${trimmedIdentityName}, role: ${trimmedRoleName}`);
     
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     let hasRole = false;
     let adminOption = false;
@@ -378,7 +391,7 @@ previewRoutes.post('/permissions-filtered', requireConnection, async (req, res) 
       });
     }
     
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     const allPermissions: CurrentPermission[] = [];
     
     // Get current database name for database privileges filtering
@@ -686,7 +699,7 @@ previewRoutes.post('/run', requireConnection, async (req, res) => {
 
     let client;
     try {
-      client = await currentConnection!.connect();
+      client = await (req as any).connection.connect();
       console.log('Database client acquired successfully');
     } catch (error) {
       console.error('Failed to acquire database client:', error);
@@ -770,7 +783,7 @@ previewRoutes.post('/:action', requireConnection, async (req, res) => {
     let currentDatabaseName = '';
     if (action === 'grant_database' || action === 'revoke_database') {
       try {
-        const client = await currentConnection!.connect();
+        const client = await (req as any).connection.connect();
         const dbResult = await client.query('SELECT current_database() as db_name');
         currentDatabaseName = dbResult.rows[0]?.db_name || '';
         client.release();

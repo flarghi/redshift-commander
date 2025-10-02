@@ -1,22 +1,34 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { User, ApiResponse } from '../types';
 
 export const usersRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
-  if (!currentConnection) {
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
+  req.connection = connection;
   next();
 };
 
 usersRoutes.get('/', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const usersQuery = `
       SELECT 
@@ -105,7 +117,7 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
       });
     }
 
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Escape the username and password for SQL injection protection
     const escapedUsername = username.replace(/'/g, "''");
@@ -145,7 +157,7 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
       });
     }
 
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Escape the group name for SQL injection protection
     const escapedGroupname = groupname.replace(/'/g, "''");
@@ -195,7 +207,7 @@ usersRoutes.post('/create-role', requireConnection, async (req, res) => {
       });
     }
 
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     // Escape the role name for SQL injection protection
     const escapedRolename = rolename.replace(/'/g, "''");

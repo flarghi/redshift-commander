@@ -1,16 +1,30 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { GrantRequest, ApiResponse } from '../types';
+import { validateBody } from '../utils/validationMiddleware';
+import { GrantRevokeSchema, PreviewGrantRevokeSchema } from '../utils/validationSchemas';
 
 export const grantsRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
-  if (!currentConnection) {
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
+  req.connection = connection;
   next();
 };
 
@@ -110,8 +124,9 @@ const generateGrantSQL = (request: GrantRequest): string[] => {
   return statements;
 };
 
-grantsRoutes.post('/preview', requireConnection, async (req, res) => {
+grantsRoutes.post('/preview', validateBody(PreviewGrantRevokeSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const request: GrantRequest = req.body;
     const statements = generateGrantSQL(request);
     
@@ -129,15 +144,16 @@ grantsRoutes.post('/preview', requireConnection, async (req, res) => {
   }
 });
 
-grantsRoutes.post('/execute', requireConnection, async (req, res) => {
+grantsRoutes.post('/execute', validateBody(GrantRevokeSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const request: GrantRequest = req.body;
     console.log('Grant request received:', request);
     
     const statements = generateGrantSQL(request);
     console.log('Generated SQL statements:', statements);
     
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     const results: string[] = [];
     const errors: string[] = [];
     

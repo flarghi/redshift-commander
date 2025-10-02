@@ -1,22 +1,37 @@
 import { Router } from 'express';
-import { currentConnection } from './connect';
+import { getConnectionBySessionId } from './connect';
 import { User, ApiResponse } from '../types';
+import { quoteIdentifier, escapeLiteral } from '../utils/sqlUtils';
+import { validateBody } from '../utils/validationMiddleware';
+import { CreateUserSchema, CreateGroupSchema, CreateRoleSchema } from '../utils/validationSchemas';
 
 export const usersRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
-  if (!currentConnection) {
+  const sessionId = req.query.sessionId || req.body.sessionId;
+  
+  if (!sessionId) {
     return res.status(400).json({
       success: false,
-      error: 'No database connection established'
+      error: 'Session ID required'
     });
   }
+
+  const connection = getConnectionBySessionId(sessionId);
+  if (!connection) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired session'
+    });
+  }
+
+  req.connection = connection;
   next();
 };
 
 usersRoutes.get('/', requireConnection, async (req, res) => {
   try {
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
     const usersQuery = `
       SELECT 
@@ -62,17 +77,17 @@ usersRoutes.get('/', requireConnection, async (req, res) => {
     client.release();
 
     const users: User[] = [
-      ...usersResult.rows.map(row => ({
+      ...usersResult.rows.map((row: any) => ({
         username: row.username,
         type: 'user' as const,
         isActive: row.is_active
       })),
-      ...groupsResult.rows.map(row => ({
+      ...groupsResult.rows.map((row: any) => ({
         username: row.username,
         type: 'group' as const,
         isActive: row.is_active
       })),
-      ...rolesResult.rows.map(row => ({
+      ...rolesResult.rows.map((row: any) => ({
         username: row.username,
         type: 'role' as const,
         isActive: row.is_active
@@ -93,25 +108,18 @@ usersRoutes.get('/', requireConnection, async (req, res) => {
   }
 });
 
-// Create User endpoint
-usersRoutes.post('/create-user', requireConnection, async (req, res) => {
+// Create User endpoint with Zod validation
+usersRoutes.post('/create-user', validateBody(CreateUserSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username and password are required'
-      });
-    }
 
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
-    // Escape the username and password for SQL injection protection
-    const escapedUsername = username.replace(/'/g, "''");
-    const escapedPassword = password.replace(/'/g, "''");
+    const quotedUsername = quoteIdentifier(username);
+    const escapedPassword = escapeLiteral(password);
     
-    const createUserQuery = `CREATE USER "${escapedUsername}" WITH PASSWORD '${escapedPassword}';`;
+    const createUserQuery = `CREATE USER ${quotedUsername} WITH PASSWORD ${escapedPassword};`;
     
     console.log('Executing SQL:', createUserQuery.replace(escapedPassword, '***'));
     await client.query(createUserQuery);
@@ -124,6 +132,7 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
     };
     res.json(response);
   } catch (error) {
+    // Only database/connection errors reach here (500)
     console.error('Error creating user:', error);
     const response: ApiResponse = {
       success: false,
@@ -133,32 +142,25 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
   }
 });
 
-// Create Group endpoint
-usersRoutes.post('/create-group', requireConnection, async (req, res) => {
+// Create Group endpoint with Zod validation
+usersRoutes.post('/create-group', validateBody(CreateGroupSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const { groupname, users = [] } = req.body;
-    
-    if (!groupname) {
-      return res.status(400).json({
-        success: false,
-        error: 'Group name is required'
-      });
-    }
 
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
-    // Escape the group name for SQL injection protection
-    const escapedGroupname = groupname.replace(/'/g, "''");
+    const quotedGroupname = quoteIdentifier(groupname);
     
-    const createGroupQuery = `CREATE GROUP "${escapedGroupname}";`;
+    const createGroupQuery = `CREATE GROUP ${quotedGroupname};`;
     console.log('Executing SQL:', createGroupQuery);
     await client.query(createGroupQuery);
     console.log('Group created successfully');
     
     // Add users to group if specified
     if (users.length > 0) {
-      const escapedUsers = users.map((user: string) => `"${user.replace(/'/g, "''")}"`).join(', ');
-      const addUsersQuery = `ALTER GROUP "${escapedGroupname}" ADD USER ${escapedUsers};`;
+      const quotedUsers = users.map((user: string) => quoteIdentifier(user)).join(', ');
+      const addUsersQuery = `ALTER GROUP ${quotedGroupname} ADD USER ${quotedUsers};`;
       console.log('Executing SQL:', addUsersQuery);
       await client.query(addUsersQuery);
       console.log('Users added to group successfully');
@@ -174,6 +176,7 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
     };
     res.json(response);
   } catch (error) {
+    // Only database/connection errors reach here (500)
     console.error('Error creating group:', error);
     const response: ApiResponse = {
       success: false,
@@ -183,24 +186,17 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
   }
 });
 
-// Create Role endpoint
-usersRoutes.post('/create-role', requireConnection, async (req, res) => {
+// Create Role endpoint with Zod validation
+usersRoutes.post('/create-role', validateBody(CreateRoleSchema), requireConnection, async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const { rolename } = req.body;
-    
-    if (!rolename) {
-      return res.status(400).json({
-        success: false,
-        error: 'Role name is required'
-      });
-    }
 
-    const client = await currentConnection!.connect();
+    const client = await (req as any).connection.connect();
     
-    // Escape the role name for SQL injection protection
-    const escapedRolename = rolename.replace(/'/g, "''");
+    const quotedRolename = quoteIdentifier(rolename);
     
-    const createRoleQuery = `CREATE ROLE "${escapedRolename}";`;
+    const createRoleQuery = `CREATE ROLE ${quotedRolename};`;
     
     console.log('Executing SQL:', createRoleQuery);
     await client.query(createRoleQuery);
@@ -213,6 +209,7 @@ usersRoutes.post('/create-role', requireConnection, async (req, res) => {
     };
     res.json(response);
   } catch (error) {
+    // Only database/connection errors reach here (500)
     console.error('Error creating role:', error);
     const response: ApiResponse = {
       success: false,

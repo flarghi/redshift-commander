@@ -1,14 +1,18 @@
 import { Router } from 'express';
 import { Pool } from 'pg';
 import { RedshiftConnection, ApiResponse } from '../types';
+import { serverSessionManager } from '../utils/serverSessionManager';
+import { validateBody, validateQuery } from '../utils/validationMiddleware';
+import { ConnectionConfigSchema, SessionIdSchema } from '../utils/validationSchemas';
 
 export const connectRoutes = Router();
 
-let currentConnection: Pool | null = null;
-let connectionConfig: RedshiftConnection | null = null;
+// Store connection pools by session ID
+const connectionPools = new Map<string, Pool>();
 
-connectRoutes.post('/test', async (req, res) => {
+connectRoutes.post('/test', validateBody(ConnectionConfigSchema), async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const config: RedshiftConnection = req.body;
     
     console.log('Testing connection to:', {
@@ -58,8 +62,9 @@ connectRoutes.post('/test', async (req, res) => {
   }
 });
 
-connectRoutes.post('/', async (req, res) => {
+connectRoutes.post('/', validateBody(ConnectionConfigSchema), async (req, res) => {
   try {
+    // Request body is now validated and typed by Zod
     const config: RedshiftConnection = req.body;
     
     console.log('Connecting to Redshift:', {
@@ -69,12 +74,9 @@ connectRoutes.post('/', async (req, res) => {
       username: config.username,
       ssl: config.ssl
     });
-    
-    if (currentConnection) {
-      await currentConnection.end();
-    }
 
-    currentConnection = new Pool({
+    // Create connection pool
+    const pool = new Pool({
       host: config.host,
       port: config.port,
       database: config.database,
@@ -86,18 +88,31 @@ connectRoutes.post('/', async (req, res) => {
       ssl: config.ssl !== false
     });
 
-    const client = await currentConnection.connect();
+    // Test connection
+    const client = await pool.connect();
     const result = await client.query('SELECT current_database(), current_user');
     client.release();
 
-    connectionConfig = config;
+    // Create server-side session (password NOT stored)
+    const sessionId = serverSessionManager.createSession(config);
+    
+    // Store connection pool
+    connectionPools.set(sessionId, pool);
 
     console.log('Connection established successfully');
     const response: ApiResponse = {
       success: true,
       data: {
+        sessionId,
         database: result.rows[0].current_database,
-        user: result.rows[0].current_user
+        user: result.rows[0].current_user,
+        connectionInfo: {
+          host: config.host,
+          database: config.database,
+          username: config.username,
+          port: config.port,
+          ssl: config.ssl
+        }
       }
     };
     res.json(response);
@@ -118,35 +133,52 @@ connectRoutes.post('/', async (req, res) => {
   }
 });
 
-connectRoutes.get('/status', (req, res) => {
+connectRoutes.get('/status', validateQuery(SessionIdSchema), (req, res) => {
+  // Query is now validated and typed by Zod
+  const { sessionId } = req.query as { sessionId: string };
+
+  const session = serverSessionManager.getSession(sessionId);
+  const pool = connectionPools.get(sessionId);
+
+  if (!session || !pool) {
+    return res.json({
+      success: true,
+      data: {
+        connected: false,
+        config: null
+      }
+    } as ApiResponse);
+  }
+
   const response: ApiResponse = {
     success: true,
     data: {
-      connected: currentConnection !== null,
-      config: connectionConfig ? {
-        host: connectionConfig.host,
-        port: connectionConfig.port,
-        database: connectionConfig.database,
-        username: connectionConfig.username
-      } : null
+      connected: true,
+      config: session.connectionInfo
     }
   };
   res.json(response);
 });
 
-connectRoutes.delete('/', async (req, res) => {
+connectRoutes.delete('/', validateQuery(SessionIdSchema), async (req, res) => {
   try {
-    console.log('Attempting to disconnect from Redshift');
+    // Query is now validated and typed by Zod
+    const { sessionId } = req.query as { sessionId: string };
+
+    console.log(`Attempting to disconnect session: ${sessionId.substring(0, 8)}...`);
     
-    if (currentConnection) {
-      console.log('Closing existing connection pool');
-      await currentConnection.end();
-      currentConnection = null;
-      connectionConfig = null;
-      console.log('Connection pool closed successfully');
+    // Close connection pool
+    const pool = connectionPools.get(sessionId);
+    if (pool) {
+      console.log('Closing connection pool');
+      await pool.end();
+      connectionPools.delete(sessionId);
     } else {
-      console.log('No active connection to disconnect');
+      console.log('No active connection pool found');
     }
+
+    // Destroy session
+    serverSessionManager.destroySession(sessionId);
     
     const response: ApiResponse = {
       success: true,
@@ -168,4 +200,13 @@ connectRoutes.delete('/', async (req, res) => {
   }
 });
 
-export { currentConnection };
+// Helper function to get connection pool by session ID
+export function getConnectionBySessionId(sessionId: string): Pool | null {
+  // Validate session is still active
+  const session = serverSessionManager.getSession(sessionId);
+  if (!session) {
+    return null;
+  }
+
+  return connectionPools.get(sessionId) || null;
+}

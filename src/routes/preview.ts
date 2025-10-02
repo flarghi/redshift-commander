@@ -1,6 +1,14 @@
 import { Router } from 'express';
 import { getConnectionBySessionId } from './connect';
 import { ApiResponse } from '../types';
+import { 
+  quoteIdentifier, 
+  buildInClause, 
+  validateIdentifier,
+  buildSchemaTable,
+  validatePrivileges,
+  validateAction
+} from '../utils/sqlUtils';
 
 export const previewRoutes = Router();
 
@@ -52,6 +60,13 @@ previewRoutes.get('/permissions/:identityName/:objectType/:schemaName/:objectNam
     const trimmedSchemaName = schemaName.trim();
     const trimmedObjectName = objectName ? objectName.trim() : objectName;
     
+    // Validate identifiers to prevent SQL injection
+    validateIdentifier(trimmedIdentityName, 'identity name');
+    validateIdentifier(trimmedSchemaName, 'schema name');
+    if (trimmedObjectName) {
+      validateIdentifier(trimmedObjectName, 'object name');
+    }
+    
     console.log(`SHOW GRANTS query for:`, {
       identityName: trimmedIdentityName,
       objectType,
@@ -61,9 +76,9 @@ previewRoutes.get('/permissions/:identityName/:objectType/:schemaName/:objectNam
     
     const client = await (req as any).connection.connect();
     
-    // Use SHOW GRANTS FOR query to get privileges for the specific identity
-    // Note: For this endpoint, we don't have identity type info, so we'll try both formats
-    const showGrantsQuery = `SHOW GRANTS FOR ${trimmedIdentityName}`;
+    // Use SHOW GRANTS FOR query with properly quoted identifier
+    const quotedIdentity = quoteIdentifier(trimmedIdentityName);
+    const showGrantsQuery = `SHOW GRANTS FOR ${quotedIdentity}`;
     console.log(`Executing SHOW GRANTS query: ${showGrantsQuery}`);
     
     let result;
@@ -73,7 +88,7 @@ previewRoutes.get('/permissions/:identityName/:objectType/:schemaName/:objectNam
       console.log(`SHOW GRANTS error for ${trimmedIdentityName}:`, error.message);
       // Try with ROLE prefix in case it's a role identity
       try {
-        const roleQuery = `SHOW GRANTS FOR ROLE ${trimmedIdentityName}`;
+        const roleQuery = `SHOW GRANTS FOR ROLE ${quotedIdentity}`;
         console.log(`Trying SHOW GRANTS with ROLE: ${roleQuery}`);
         result = await client.query(roleQuery);
       } catch (roleError: any) {
@@ -121,7 +136,7 @@ previewRoutes.get('/permissions/:identityName/:objectType/:schemaName/:objectNam
     const permissions: CurrentPermission[] = [];
     
     if (result.rows && result.rows.length > 0) {
-      result.rows.forEach(row => {
+      result.rows.forEach((row: any) => {
         // SHOW GRANTS returns structured data with these fields:
         // database_name, schema_name, object_name, object_type, privilege_type, 
         // identity_id, identity_name, identity_type, privilege_scope
@@ -181,6 +196,9 @@ previewRoutes.get('/permissions-summary/:identityName', requireConnection, async
     const { identityName } = req.params;
     const trimmedIdentityName = identityName.trim();
     
+    // Validate identifier to prevent SQL injection
+    validateIdentifier(trimmedIdentityName, 'identity name');
+    
     console.log(`SHOW GRANTS summary for identity: ${trimmedIdentityName}`);
     
     const client = await (req as any).connection.connect();
@@ -195,9 +213,9 @@ previewRoutes.get('/permissions-summary/:identityName', requireConnection, async
       console.log(`Failed to get current database name for summary:`, error.message);
     }
     
-    // Use SHOW GRANTS FOR query to get all privileges for the identity
-    // Note: For this endpoint, we don't have identity type info, so we'll try both formats
-    const showGrantsQuery = `SHOW GRANTS FOR ${trimmedIdentityName}`;
+    // Use SHOW GRANTS FOR query with properly quoted identifier
+    const quotedIdentity = quoteIdentifier(trimmedIdentityName);
+    const showGrantsQuery = `SHOW GRANTS FOR ${quotedIdentity}`;
     console.log(`Executing SHOW GRANTS query: ${showGrantsQuery}`);
     
     let result;
@@ -207,7 +225,7 @@ previewRoutes.get('/permissions-summary/:identityName', requireConnection, async
       console.log(`SHOW GRANTS error for ${trimmedIdentityName}:`, error.message);
       // Try with ROLE prefix in case it's a role identity
       try {
-        const roleQuery = `SHOW GRANTS FOR ROLE ${trimmedIdentityName}`;
+        const roleQuery = `SHOW GRANTS FOR ROLE ${quotedIdentity}`;
         console.log(`Trying SHOW GRANTS with ROLE: ${roleQuery}`);
         result = await client.query(roleQuery);
       } catch (roleError: any) {
@@ -235,7 +253,7 @@ previewRoutes.get('/permissions-summary/:identityName', requireConnection, async
     const permissions: CurrentPermission[] = [];
     
     if (result.rows && result.rows.length > 0) {
-      result.rows.forEach(row => {
+      result.rows.forEach((row: any) => {
         // SHOW GRANTS returns structured data with these fields:
         // database_name, schema_name, object_name, object_type, privilege_type, 
         // identity_id, identity_name, identity_type, privilege_scope
@@ -432,7 +450,7 @@ previewRoutes.post('/permissions-filtered', requireConnection, async (req, res) 
         console.log(`svv_default_privileges result:`, result.rows);
         
         if (result.rows && result.rows.length > 0) {
-          result.rows.forEach(row => {
+          result.rows.forEach((row: any) => {
             // Filter by selected schemas if any
             const shouldInclude = !objects || objects.length === 0 || 
               objects.some((obj: any) => obj.type === 'schema' && obj.name === row.schema_name);
@@ -476,7 +494,7 @@ previewRoutes.post('/permissions-filtered', requireConnection, async (req, res) 
         
         // Process user role grants
         if (userRoleResult.rows && userRoleResult.rows.length > 0) {
-          userRoleResult.rows.forEach(row => {
+          userRoleResult.rows.forEach((row: any) => {
             // Check if this user is in our selected identities and role is in selected objects
             const isSelectedIdentity = identities.some(id => id.name === row.user_name);
             const isSelectedRole = !objects || objects.length === 0 || 
@@ -499,7 +517,7 @@ previewRoutes.post('/permissions-filtered', requireConnection, async (req, res) 
         
         // Process role to role grants
         if (roleRoleResult.rows && roleRoleResult.rows.length > 0) {
-          roleRoleResult.rows.forEach(row => {
+          roleRoleResult.rows.forEach((row: any) => {
             // Check if this role is in our selected identities and granted role is in selected objects
             const isSelectedIdentity = identities.some(id => id.name === row.role_name);
             const isSelectedRole = !objects || objects.length === 0 || 
@@ -537,7 +555,7 @@ previewRoutes.post('/permissions-filtered', requireConnection, async (req, res) 
           console.log(`SHOW GRANTS result for ${trimmedIdentityName}:`, result.rows);
         
         if (result.rows && result.rows.length > 0) {
-          result.rows.forEach(row => {
+          result.rows.forEach((row: any) => {
             // SHOW GRANTS returns structured data with these fields:
             // database_name, schema_name, object_name, object_type, privilege_type, 
             // identity_id, identity_name, identity_type, privilege_scope
@@ -845,21 +863,37 @@ previewRoutes.post('/:action', requireConnection, async (req, res) => {
   }
 });
 
-// Helper functions to generate SQL
+// Helper functions to generate SQL - SECURE VERSIONS
 function generateGrantSQL(identities: any[], objects: any[], permissions: any[]): string {
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    // Validate identity name
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     objects.forEach(object => {
-      const privs = permissions.map(p => p.value).join(', ');
+      // Validate object names
+      validateIdentifier(object.name, 'object name');
+      if (object.schema) {
+        validateIdentifier(object.schema, 'schema name');
+      }
+      
+      // Validate privileges
+      const privValues = permissions.map((p: any) => p.value);
+      const validPrivs = validatePrivileges(privValues, object.type || 'table');
+      const privs = validPrivs.join(', ');
       
       // Handle ALL tables in schema
       if (object.isAllTables && object.type === 'schema') {
-        statements.push(`GRANT ${privs} ON ALL TABLES IN SCHEMA ${object.name} TO ${identity.name};`);
+        const quotedSchema = quoteIdentifier(object.name);
+        statements.push(`GRANT ${privs} ON ALL TABLES IN SCHEMA ${quotedSchema} TO ${quotedIdentity};`);
       } else {
         const objectType = (object.type === 'table' || object.type === 'view') ? 'TABLE' : 'SCHEMA';
-        const objectRef = object.schema ? `${object.schema}.${object.name}` : object.name;
-        statements.push(`GRANT ${privs} ON ${objectType} ${objectRef} TO ${identity.name};`);
+        const objectRef = object.schema 
+          ? buildSchemaTable(object.schema, object.name)
+          : quoteIdentifier(object.name);
+        statements.push(`GRANT ${privs} ON ${objectType} ${objectRef} TO ${quotedIdentity};`);
       }
     });
   });
@@ -871,16 +905,32 @@ function generateRevokeSQL(identities: any[], objects: any[], permissions: any[]
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    // Validate identity name
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     objects.forEach(object => {
-      const privs = permissions.map(p => p.value).join(', ');
+      // Validate object names
+      validateIdentifier(object.name, 'object name');
+      if (object.schema) {
+        validateIdentifier(object.schema, 'schema name');
+      }
+      
+      // Validate privileges
+      const privValues = permissions.map((p: any) => p.value);
+      const validPrivs = validatePrivileges(privValues, object.type || 'table');
+      const privs = validPrivs.join(', ');
       
       // Handle ALL tables in schema
       if (object.isAllTables && object.type === 'schema') {
-        statements.push(`REVOKE ${privs} ON ALL TABLES IN SCHEMA ${object.name} FROM ${identity.name};`);
+        const quotedSchema = quoteIdentifier(object.name);
+        statements.push(`REVOKE ${privs} ON ALL TABLES IN SCHEMA ${quotedSchema} FROM ${quotedIdentity};`);
       } else {
         const objectType = (object.type === 'table' || object.type === 'view') ? 'TABLE' : 'SCHEMA';
-        const objectRef = object.schema ? `${object.schema}.${object.name}` : object.name;
-        statements.push(`REVOKE ${privs} ON ${objectType} ${objectRef} FROM ${identity.name};`);
+        const objectRef = object.schema 
+          ? buildSchemaTable(object.schema, object.name)
+          : quoteIdentifier(object.name);
+        statements.push(`REVOKE ${privs} ON ${objectType} ${objectRef} FROM ${quotedIdentity};`);
       }
     });
   });
@@ -892,9 +942,18 @@ function generateGrantDefaultSQL(identities: any[], objects: any[], permissions:
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     objects.forEach(object => {
-      const privs = permissions.map(p => p.value).join(', ');
-      statements.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${object.name} GRANT ${privs} ON TABLES TO ${identity.name};`);
+      validateIdentifier(object.name, 'schema name');
+      const quotedSchema = quoteIdentifier(object.name);
+      
+      const privValues = permissions.map((p: any) => p.value);
+      const validPrivs = validatePrivileges(privValues, 'table');
+      const privs = validPrivs.join(', ');
+      
+      statements.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${quotedSchema} GRANT ${privs} ON TABLES TO ${quotedIdentity};`);
     });
   });
   
@@ -905,9 +964,18 @@ function generateRevokeDefaultSQL(identities: any[], objects: any[], permissions
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     objects.forEach(object => {
-      const privs = permissions.map(p => p.value).join(', ');
-      statements.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${object.name} REVOKE ${privs} ON TABLES FROM ${identity.name};`);
+      validateIdentifier(object.name, 'schema name');
+      const quotedSchema = quoteIdentifier(object.name);
+      
+      const privValues = permissions.map((p: any) => p.value);
+      const validPrivs = validatePrivileges(privValues, 'table');
+      const privs = validPrivs.join(', ');
+      
+      statements.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${quotedSchema} REVOKE ${privs} ON TABLES FROM ${quotedIdentity};`);
     });
   });
   
@@ -918,9 +986,18 @@ function generateGrantSchemaSQL(identities: any[], objects: any[], permissions: 
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     objects.forEach(object => {
-      const privs = permissions.map(p => p.value).join(', ');
-      statements.push(`GRANT ${privs} ON SCHEMA ${object.name} TO ${identity.name};`);
+      validateIdentifier(object.name, 'schema name');
+      const quotedSchema = quoteIdentifier(object.name);
+      
+      const privValues = permissions.map((p: any) => p.value);
+      const validPrivs = validatePrivileges(privValues, 'schema');
+      const privs = validPrivs.join(', ');
+      
+      statements.push(`GRANT ${privs} ON SCHEMA ${quotedSchema} TO ${quotedIdentity};`);
     });
   });
   
@@ -931,9 +1008,18 @@ function generateRevokeSchemaSQL(identities: any[], objects: any[], permissions:
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     objects.forEach(object => {
-      const privs = permissions.map(p => p.value).join(', ');
-      statements.push(`REVOKE ${privs} ON SCHEMA ${object.name} FROM ${identity.name};`);
+      validateIdentifier(object.name, 'schema name');
+      const quotedSchema = quoteIdentifier(object.name);
+      
+      const privValues = permissions.map((p: any) => p.value);
+      const validPrivs = validatePrivileges(privValues, 'schema');
+      const privs = validPrivs.join(', ');
+      
+      statements.push(`REVOKE ${privs} ON SCHEMA ${quotedSchema} FROM ${quotedIdentity};`);
     });
   });
   
@@ -944,9 +1030,16 @@ function generateGrantDatabaseSQL(identities: any[], permissions: any[], databas
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    const privs = permissions.map(p => p.value).join(', ');
-    const dbName = databaseName || 'current_database()';
-    statements.push(`GRANT ${privs} ON DATABASE ${dbName} TO ${identity.name};`);
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
+    const privValues = permissions.map((p: any) => p.value);
+    const validPrivs = validatePrivileges(privValues, 'database');
+    const privs = validPrivs.join(', ');
+    
+    // Quote database name if provided, otherwise use current_database()
+    const dbName = databaseName ? quoteIdentifier(databaseName) : 'current_database()';
+    statements.push(`GRANT ${privs} ON DATABASE ${dbName} TO ${quotedIdentity};`);
   });
   
   return statements.join('\n');
@@ -956,9 +1049,16 @@ function generateRevokeDatabaseSQL(identities: any[], permissions: any[], databa
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    const privs = permissions.map(p => p.value).join(', ');
-    const dbName = databaseName || 'current_database()';
-    statements.push(`REVOKE ${privs} ON DATABASE ${dbName} FROM ${identity.name};`);
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
+    const privValues = permissions.map((p: any) => p.value);
+    const validPrivs = validatePrivileges(privValues, 'database');
+    const privs = validPrivs.join(', ');
+    
+    // Quote database name if provided, otherwise use current_database()
+    const dbName = databaseName ? quoteIdentifier(databaseName) : 'current_database()';
+    statements.push(`REVOKE ${privs} ON DATABASE ${dbName} FROM ${quotedIdentity};`);
   });
   
   return statements.join('\n');
@@ -968,10 +1068,16 @@ function generateGrantRoleSQL(identities: any[], targets: any[]): string {
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     targets.forEach(target => {
+      validateIdentifier(target.name, 'target role name');
+      const quotedTarget = quoteIdentifier(target.name);
+      
       // Add ROLE keyword before target role name and identity if it's a role
-      const targetWithRole = `ROLE ${target.name}`;
-      const identityWithRole = identity.type === 'role' ? `ROLE ${identity.name}` : identity.name;
+      const targetWithRole = `ROLE ${quotedTarget}`;
+      const identityWithRole = identity.type === 'role' ? `ROLE ${quotedIdentity}` : quotedIdentity;
       statements.push(`GRANT ${targetWithRole} TO ${identityWithRole};`);
     });
   });
@@ -983,10 +1089,16 @@ function generateRevokeRoleSQL(identities: any[], targets: any[]): string {
   const statements: string[] = [];
   
   identities.forEach(identity => {
+    validateIdentifier(identity.name, 'identity name');
+    const quotedIdentity = quoteIdentifier(identity.name);
+    
     targets.forEach(target => {
+      validateIdentifier(target.name, 'target role name');
+      const quotedTarget = quoteIdentifier(target.name);
+      
       // Add ROLE keyword before target role name and identity if it's a role
-      const targetWithRole = `ROLE ${target.name}`;
-      const identityWithRole = identity.type === 'role' ? `ROLE ${identity.name}` : identity.name;
+      const targetWithRole = `ROLE ${quotedTarget}`;
+      const identityWithRole = identity.type === 'role' ? `ROLE ${quotedIdentity}` : quotedIdentity;
       statements.push(`REVOKE ${targetWithRole} FROM ${identityWithRole};`);
     });
   });

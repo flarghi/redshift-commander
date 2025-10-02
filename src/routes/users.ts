@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getConnectionBySessionId } from './connect';
 import { User, ApiResponse } from '../types';
+import { quoteIdentifier, validateIdentifier, escapeLiteral } from '../utils/sqlUtils';
 
 export const usersRoutes = Router();
 
@@ -74,17 +75,17 @@ usersRoutes.get('/', requireConnection, async (req, res) => {
     client.release();
 
     const users: User[] = [
-      ...usersResult.rows.map(row => ({
+      ...usersResult.rows.map((row: any) => ({
         username: row.username,
         type: 'user' as const,
         isActive: row.is_active
       })),
-      ...groupsResult.rows.map(row => ({
+      ...groupsResult.rows.map((row: any) => ({
         username: row.username,
         type: 'group' as const,
         isActive: row.is_active
       })),
-      ...rolesResult.rows.map(row => ({
+      ...rolesResult.rows.map((row: any) => ({
         username: row.username,
         type: 'role' as const,
         isActive: row.is_active
@@ -119,11 +120,12 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
 
     const client = await (req as any).connection.connect();
     
-    // Escape the username and password for SQL injection protection
-    const escapedUsername = username.replace(/'/g, "''");
-    const escapedPassword = password.replace(/'/g, "''");
+    // Validate and quote username, escape password
+    validateIdentifier(username, 'username');
+    const quotedUsername = quoteIdentifier(username);
+    const escapedPassword = escapeLiteral(password);
     
-    const createUserQuery = `CREATE USER "${escapedUsername}" WITH PASSWORD '${escapedPassword}';`;
+    const createUserQuery = `CREATE USER ${quotedUsername} WITH PASSWORD ${escapedPassword};`;
     
     console.log('Executing SQL:', createUserQuery.replace(escapedPassword, '***'));
     await client.query(createUserQuery);
@@ -159,18 +161,23 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
 
     const client = await (req as any).connection.connect();
     
-    // Escape the group name for SQL injection protection
-    const escapedGroupname = groupname.replace(/'/g, "''");
+    // Validate and quote group name
+    validateIdentifier(groupname, 'group name');
+    const quotedGroupname = quoteIdentifier(groupname);
     
-    const createGroupQuery = `CREATE GROUP "${escapedGroupname}";`;
+    const createGroupQuery = `CREATE GROUP ${quotedGroupname};`;
     console.log('Executing SQL:', createGroupQuery);
     await client.query(createGroupQuery);
     console.log('Group created successfully');
     
     // Add users to group if specified
     if (users.length > 0) {
-      const escapedUsers = users.map((user: string) => `"${user.replace(/'/g, "''")}"`).join(', ');
-      const addUsersQuery = `ALTER GROUP "${escapedGroupname}" ADD USER ${escapedUsers};`;
+      // Validate and quote all user names
+      const quotedUsers = users.map((user: string) => {
+        validateIdentifier(user, 'user name');
+        return quoteIdentifier(user);
+      }).join(', ');
+      const addUsersQuery = `ALTER GROUP ${quotedGroupname} ADD USER ${quotedUsers};`;
       console.log('Executing SQL:', addUsersQuery);
       await client.query(addUsersQuery);
       console.log('Users added to group successfully');
@@ -209,10 +216,11 @@ usersRoutes.post('/create-role', requireConnection, async (req, res) => {
 
     const client = await (req as any).connection.connect();
     
-    // Escape the role name for SQL injection protection
-    const escapedRolename = rolename.replace(/'/g, "''");
+    // Validate and quote role name
+    validateIdentifier(rolename, 'role name');
+    const quotedRolename = quoteIdentifier(rolename);
     
-    const createRoleQuery = `CREATE ROLE "${escapedRolename}";`;
+    const createRoleQuery = `CREATE ROLE ${quotedRolename};`;
     
     console.log('Executing SQL:', createRoleQuery);
     await client.query(createRoleQuery);

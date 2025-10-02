@@ -73,7 +73,7 @@ permissionsRoutes.get('/', requireConnection, async (req, res) => {
     
     client.release();
 
-    const permissions: Permission[] = result.rows.map(row => ({
+    const permissions: Permission[] = result.rows.map((row: any) => ({
       objectType: row.objecttype,
       objectName: row.objectname,
       schema: row.schema,
@@ -145,7 +145,7 @@ permissionsRoutes.get('/object/:schema/:objectName', requireConnection, async (r
     
     client.release();
 
-    const permissions: Permission[] = result.rows.map(row => ({
+    const permissions: Permission[] = result.rows.map((row: any) => ({
       objectType: row.objecttype,
       objectName: row.objectname,
       schema: row.schema,

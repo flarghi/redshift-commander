@@ -43,7 +43,7 @@ objectsRoutes.get('/schemas', requireConnection, async (req, res) => {
     const result = await client.query(query);
     client.release();
 
-    const schemas: DatabaseObject[] = result.rows.map(row => ({
+    const schemas: DatabaseObject[] = result.rows.map((row: any) => ({
       type: 'schema' as const,
       name: row.name,
       children: []
@@ -86,7 +86,7 @@ objectsRoutes.get('/tables/:schema', requireConnection, async (req, res) => {
     const result = await client.query(query, [schema]);
     client.release();
 
-    const objects: DatabaseObject[] = result.rows.map(row => ({
+    const objects: DatabaseObject[] = result.rows.map((row: any) => ({
       type: row.type as 'table' | 'view',
       name: row.name,
       schema: row.schema
@@ -124,7 +124,7 @@ objectsRoutes.get('/functions/:schema', requireConnection, async (req, res) => {
     const result = await client.query(query, [schema]);
     client.release();
 
-    const functions: DatabaseObject[] = result.rows.map(row => ({
+    const functions: DatabaseObject[] = result.rows.map((row: any) => ({
       type: 'function' as const,
       name: row.name,
       schema: row.schema
@@ -163,7 +163,7 @@ objectsRoutes.get('/schemas-only', requireConnection, async (req, res) => {
     const result = await client.query(query);
     client.release();
 
-    const schemas: DatabaseObject[] = result.rows.map(row => ({
+    const schemas: DatabaseObject[] = result.rows.map((row: any) => ({
       type: 'schema' as const,
       name: row.name,
       children: [] // Empty children for fast loading
@@ -201,7 +201,7 @@ objectsRoutes.get('/roles', requireConnection, async (req, res) => {
     
     client.release();
 
-    const roles: DatabaseObject[] = result.rows.map(row => ({
+    const roles: DatabaseObject[] = result.rows.map((row: any) => ({
       type: 'role' as const,
       name: row.name
     }));

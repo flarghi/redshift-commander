@@ -29,7 +29,7 @@ function App() {
     isLoading,
     error,
     isConnected,
-    connectionConfig,
+    connectionInfo,
     initializeFromSession,
     disconnect,
     action,
@@ -111,19 +111,19 @@ function App() {
               <Badge colorScheme={isConnected ? 'green' : 'red'} size="lg" flexShrink={0}>
                 {isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
-              {connectionConfig && showConnectionString && (
+              {connectionInfo && showConnectionString && (
                 <Text 
                   fontSize="sm" 
                   color="text-connection"
                   isTruncated 
                   maxW="calc(100vw - 800px)"
                   minW={0}
-                  title={`${connectionConfig.username}@${connectionConfig.host}:${connectionConfig.port}/${connectionConfig.database}`}
+                  title={`${connectionInfo.username}@${connectionInfo.host}:${connectionInfo.port}/${connectionInfo.database}`}
                 >
-                  {connectionConfig.username}@{connectionConfig.host}:{connectionConfig.port}/{connectionConfig.database}
+                  {connectionInfo.username}@{connectionInfo.host}:{connectionInfo.port}/{connectionInfo.database}
                 </Text>
               )}
-              {connectionConfig && (
+              {connectionInfo && (
                 <IconButton
                   aria-label={showConnectionString ? "Hide connection string" : "Show connection string"}
                   icon={showConnectionString ? <ViewOffIcon /> : <ViewIcon />}

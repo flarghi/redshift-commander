@@ -145,7 +145,7 @@ function App() {
         {!isConnected && (
           <Alert status="info" mb={6}>
             <AlertIcon />
-            Please connect to a Redshift database to begin managing permissions.
+            Please connect to a Redshift cluster to begin managing permissions.
           </Alert>
         )}
       </Box>

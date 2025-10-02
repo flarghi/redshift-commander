@@ -118,10 +118,19 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
       });
     }
 
+    // Validate input - return 400 for validation errors (bad request)
+    try {
+      validateIdentifier(username, 'username');
+    } catch (validationError) {
+      console.log('Validation failed for username:', username);
+      return res.status(400).json({
+        success: false,
+        error: validationError instanceof Error ? validationError.message : 'Invalid username'
+      });
+    }
+
     const client = await (req as any).connection.connect();
     
-    // Validate and quote username, escape password
-    validateIdentifier(username, 'username');
     const quotedUsername = quoteIdentifier(username);
     const escapedPassword = escapeLiteral(password);
     
@@ -138,6 +147,7 @@ usersRoutes.post('/create-user', requireConnection, async (req, res) => {
     };
     res.json(response);
   } catch (error) {
+    // Only database/connection errors reach here (500)
     console.error('Error creating user:', error);
     const response: ApiResponse = {
       success: false,
@@ -159,10 +169,24 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
       });
     }
 
+    // Validate input - return 400 for validation errors (bad request)
+    try {
+      validateIdentifier(groupname, 'group name');
+      
+      // Validate all user names
+      for (const user of users) {
+        validateIdentifier(user, 'user name');
+      }
+    } catch (validationError) {
+      console.log('Validation failed for group:', groupname);
+      return res.status(400).json({
+        success: false,
+        error: validationError instanceof Error ? validationError.message : 'Invalid group or user name'
+      });
+    }
+
     const client = await (req as any).connection.connect();
     
-    // Validate and quote group name
-    validateIdentifier(groupname, 'group name');
     const quotedGroupname = quoteIdentifier(groupname);
     
     const createGroupQuery = `CREATE GROUP ${quotedGroupname};`;
@@ -172,11 +196,7 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
     
     // Add users to group if specified
     if (users.length > 0) {
-      // Validate and quote all user names
-      const quotedUsers = users.map((user: string) => {
-        validateIdentifier(user, 'user name');
-        return quoteIdentifier(user);
-      }).join(', ');
+      const quotedUsers = users.map((user: string) => quoteIdentifier(user)).join(', ');
       const addUsersQuery = `ALTER GROUP ${quotedGroupname} ADD USER ${quotedUsers};`;
       console.log('Executing SQL:', addUsersQuery);
       await client.query(addUsersQuery);
@@ -193,6 +213,7 @@ usersRoutes.post('/create-group', requireConnection, async (req, res) => {
     };
     res.json(response);
   } catch (error) {
+    // Only database/connection errors reach here (500)
     console.error('Error creating group:', error);
     const response: ApiResponse = {
       success: false,
@@ -214,10 +235,19 @@ usersRoutes.post('/create-role', requireConnection, async (req, res) => {
       });
     }
 
+    // Validate input - return 400 for validation errors (bad request)
+    try {
+      validateIdentifier(rolename, 'role name');
+    } catch (validationError) {
+      console.log('Validation failed for role:', rolename);
+      return res.status(400).json({
+        success: false,
+        error: validationError instanceof Error ? validationError.message : 'Invalid role name'
+      });
+    }
+
     const client = await (req as any).connection.connect();
     
-    // Validate and quote role name
-    validateIdentifier(rolename, 'role name');
     const quotedRolename = quoteIdentifier(rolename);
     
     const createRoleQuery = `CREATE ROLE ${quotedRolename};`;
@@ -233,6 +263,7 @@ usersRoutes.post('/create-role', requireConnection, async (req, res) => {
     };
     res.json(response);
   } catch (error) {
+    // Only database/connection errors reach here (500)
     console.error('Error creating role:', error);
     const response: ApiResponse = {
       success: false,

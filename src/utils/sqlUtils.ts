@@ -46,12 +46,18 @@ export function quoteIdentifiers(identifiers: string[]): string[] {
 
 /**
  * Validates that a string is a safe identifier according to Redshift rules
+ * Blocks SQL injection patterns and dangerous characters
  * 
  * Redshift identifiers:
  * - Must start with a letter (a-z, A-Z) or underscore (_)
  * - Can contain letters, digits (0-9), underscores, and dollar signs ($)
  * - Maximum 127 characters (Redshift limit)
  * - Case-insensitive unless quoted
+ * 
+ * Blocked patterns for security:
+ * - SQL comments (double dash and block comments)
+ * - Statement separators (semicolon)
+ * - Control characters (newlines, tabs, null bytes)
  * 
  * @param identifier - The identifier to validate
  * @returns true if valid, false otherwise
@@ -61,18 +67,42 @@ export function isValidIdentifier(identifier: string): boolean {
     return false;
   }
   
+  // Check length (Redshift max identifier length is 127)
+  if (identifier.length === 0 || identifier.length > 127) {
+    return false;
+  }
+  
+  // Block dangerous patterns for SQL injection prevention
+  const dangerousPatterns = [
+    /--/,           // SQL single-line comments
+    /\/\*/,         // Multi-line comment start
+    /\*\//,         // Multi-line comment end
+    /;/,            // Statement separator
+    /\n/,           // Newline
+    /\r/,           // Carriage return
+    /\t/,           // Tab (often suspicious in identifiers)
+    /\0/,           // Null byte
+  ];
+  
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(identifier)) {
+      return false;
+    }
+  }
+  
   // Redshift identifier rules: start with letter or underscore, followed by alphanumeric, underscore, or $
   // Maximum 127 characters
-  const pattern = /^[a-zA-Z_][a-zA-Z0-9_$]{0,126}$/;
-  return pattern.test(identifier);
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_$]{0,126}$/;
+  return validPattern.test(identifier);
 }
 
 /**
  * Validates identifier and throws descriptive error if invalid
+ * Provides defense-in-depth by blocking SQL injection patterns BEFORE quoting
  * 
  * @param identifier - The identifier to validate
  * @param name - Descriptive name for error messages (e.g., "schema name", "table name")
- * @throws Error if identifier is invalid
+ * @throws Error with specific message if identifier is invalid
  */
 export function validateIdentifier(identifier: string, name: string = 'identifier'): void {
   if (!identifier || typeof identifier !== 'string') {
@@ -80,16 +110,46 @@ export function validateIdentifier(identifier: string, name: string = 'identifie
   }
   
   if (identifier.trim() !== identifier) {
-    throw new Error(`Invalid ${name}: "${identifier}" contains leading or trailing whitespace`);
+    throw new Error(`Invalid ${name}: contains leading or trailing whitespace`);
   }
   
   if (identifier.length > 127) {
-    throw new Error(`Invalid ${name}: "${identifier}" exceeds maximum length of 127 characters`);
+    throw new Error(`Invalid ${name}: exceeds maximum length of 127 characters`);
   }
   
-  // Allow any identifier that we can safely quote, but warn about non-standard ones
-  // We don't enforce strict alphanumeric because users might have existing objects with special chars
-  // The quoting function will handle escaping
+  // Check for dangerous patterns with specific error messages
+  if (identifier.includes('--')) {
+    throw new Error(`Invalid ${name}: SQL comments (--) are not allowed`);
+  }
+  
+  if (identifier.includes(';')) {
+    throw new Error(`Invalid ${name}: semicolons (;) are not allowed`);
+  }
+  
+  if (identifier.includes('/*') || identifier.includes('*/')) {
+    throw new Error(`Invalid ${name}: multi-line comments (/* */) are not allowed`);
+  }
+  
+  if (identifier.includes('\n') || identifier.includes('\r')) {
+    throw new Error(`Invalid ${name}: newline characters are not allowed`);
+  }
+  
+  if (identifier.includes('\0')) {
+    throw new Error(`Invalid ${name}: null bytes are not allowed`);
+  }
+  
+  if (identifier.includes('\t')) {
+    throw new Error(`Invalid ${name}: tab characters are not allowed`);
+  }
+  
+  // Check valid identifier pattern
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_$]*$/;
+  if (!validPattern.test(identifier)) {
+    throw new Error(
+      `Invalid ${name}: must start with a letter or underscore, ` +
+      `and contain only letters, digits, underscores, and dollar signs`
+    );
+  }
 }
 
 /**

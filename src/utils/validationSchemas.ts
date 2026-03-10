@@ -47,6 +47,42 @@ const redshiftIdentifier = z.string()
   );
 
 /**
+ * Custom Zod validator for Redshift identity names (users, groups, roles)
+ * Same dangerous-pattern blocking as redshiftIdentifier but allows colons for IAMR/IAM users
+ */
+const redshiftIdentityName = z.string()
+  .min(1, 'Identity name cannot be empty')
+  .max(127, 'Identity name cannot exceed 127 characters')
+  .refine(
+    (val) => !val.includes('--'),
+    { message: 'SQL comments (--) are not allowed' }
+  )
+  .refine(
+    (val) => !val.includes(';'),
+    { message: 'Semicolons (;) are not allowed' }
+  )
+  .refine(
+    (val) => !val.includes('/*') && !val.includes('*/'),
+    { message: 'Multi-line comments (/* */) are not allowed' }
+  )
+  .refine(
+    (val) => !val.includes('\n') && !val.includes('\r'),
+    { message: 'Newline characters are not allowed' }
+  )
+  .refine(
+    (val) => !val.includes('\t'),
+    { message: 'Tab characters are not allowed' }
+  )
+  .refine(
+    (val) => !val.includes('\0'),
+    { message: 'Null bytes are not allowed' }
+  )
+  .refine(
+    (val) => /^[a-zA-Z_][a-zA-Z0-9_$:]*$/.test(val),
+    { message: 'Identity name must start with a letter or underscore, and contain only letters, digits, underscores, dollar signs, and colons' }
+  );
+
+/**
  * Session ID validation
  * Must be a non-empty string (64-character hex for our implementation)
  */
@@ -106,7 +142,7 @@ export type CreateUserRequest = z.infer<typeof CreateUserSchema>;
  */
 export const CreateGroupSchema = z.object({
   groupname: redshiftIdentifier.describe('group name'),
-  users: z.array(redshiftIdentifier).default([]),
+  users: z.array(redshiftIdentityName).default([]),
   sessionId: sessionId
 });
 
@@ -136,7 +172,7 @@ const privilegeValue = z.string()
  * Identity Schema (for permissions)
  */
 const identitySchema = z.object({
-  name: redshiftIdentifier,
+  name: redshiftIdentityName,
   type: z.enum(['user', 'group', 'role']).optional()
 });
 
@@ -186,7 +222,7 @@ export type PreviewGrantRevokeRequest = z.infer<typeof PreviewGrantRevokeSchema>
  * Get Permissions Schema
  */
 export const GetPermissionsSchema = z.object({
-  identity: redshiftIdentifier,
+  identity: redshiftIdentityName,
   objectType: z.enum(['schema', 'table', 'view', 'function', 'database', 'role']),
   objectName: redshiftIdentifier.optional(),
   schema: redshiftIdentifier.optional(),
@@ -204,11 +240,11 @@ export const ExecuteSQLSchema = z.object({
     .max(10000, 'SQL query too long (max 10000 characters)')
     .refine(
       (val) => {
-        // Only allow GRANT and REVOKE statements
+        // Only allow GRANT, REVOKE, and ALTER DEFAULT PRIVILEGES statements
         const upperSQL = val.trim().toUpperCase();
-        return upperSQL.startsWith('GRANT ') || upperSQL.startsWith('REVOKE ');
+        return upperSQL.startsWith('GRANT ') || upperSQL.startsWith('REVOKE ') || upperSQL.startsWith('ALTER DEFAULT PRIVILEGES ');
       },
-      { message: 'Only GRANT and REVOKE statements are allowed' }
+      { message: 'Only GRANT, REVOKE, and ALTER DEFAULT PRIVILEGES statements are allowed' }
     ),
   sessionId: sessionId.optional() // Optional because requireConnection accepts it from query or body
 });
@@ -242,3 +278,30 @@ export function formatZodError(error: z.ZodError): string {
 export function isZodError(error: unknown): error is z.ZodError {
   return error instanceof z.ZodError;
 }
+
+/**
+ * Permissions Filtered Schema — for POST /permissions-filtered
+ */
+export const PermissionsFilteredSchema = z.object({
+  identities: z.array(identitySchema).min(1, 'At least one identity is required'),
+  objects: z.array(databaseObjectSchema).optional(),
+  action: z.string().optional(),
+  allTablesSelection: z.array(redshiftIdentifier).optional(),
+  sessionId: sessionId
+});
+
+export type PermissionsFilteredRequest = z.infer<typeof PermissionsFilteredSchema>;
+
+/**
+ * Preview Action Schema — for POST /:action preview endpoint
+ */
+export const PreviewActionSchema = z.object({
+  identities: z.array(identitySchema).optional(),
+  objects: z.array(databaseObjectSchema).optional(),
+  targets: z.array(identitySchema).optional(),
+  permissions: z.array(permissionSchema).optional(),
+  owner: identitySchema.optional(),
+  sessionId: sessionId
+});
+
+export type PreviewActionRequest = z.infer<typeof PreviewActionSchema>;

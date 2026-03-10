@@ -47,6 +47,7 @@ interface AppState {
   error: string | null;
   loadingSchemas: Set<string>;
   allTablesSelection: Set<string>; // Track schemas with "ALL tables" selected
+  defaultPrivilegesOwner: GrantableIdentity | null; // Owner for ALTER DEFAULT PRIVILEGES FOR USER
   refreshPrivilegesCallback: (() => void) | null; // Callback to refresh privileges
   currentPrivileges: any[];
   isRefreshingPrivileges: boolean;
@@ -68,6 +69,7 @@ interface AppState {
   setSelectedTargetIdentities: (identities: GrantableIdentity[]) => void;
   setPermissions: (permissions: Permission[]) => void;
   toggleAllTablesSelection: (schemaName: string) => void;
+  setDefaultPrivilegesOwner: (owner: GrantableIdentity | null) => void;
   generatePreview: () => Promise<void>;
   runQuery: () => Promise<void>;
   resetState: () => void;
@@ -104,6 +106,7 @@ const useStore = create<AppState>((set, get) => ({
   error: null,
   loadingSchemas: new Set(),
   allTablesSelection: new Set(),
+  defaultPrivilegesOwner: null,
   refreshPrivilegesCallback: null,
   currentPrivileges: [],
   isRefreshingPrivileges: false,
@@ -288,6 +291,7 @@ const useStore = create<AppState>((set, get) => ({
       previewSql: '',
       error: null,
       allTablesSelection: new Set(),
+      defaultPrivilegesOwner: null,
       currentPrivileges: [],
       isRefreshingPrivileges: false,
       privilegesCurrentPage: 1,
@@ -340,8 +344,12 @@ const useStore = create<AppState>((set, get) => ({
     set({ allTablesSelection: newAllTablesSelection });
   },
 
+  setDefaultPrivilegesOwner: (owner: GrantableIdentity | null) => {
+    set({ defaultPrivilegesOwner: owner });
+  },
+
   generatePreview: async () => {
-    const { action, grantOrRevoke, selectedIdentities, selectedObjects, selectedTargetIdentities, permissions, allTablesSelection } = get();
+    const { action, grantOrRevoke, selectedIdentities, selectedObjects, selectedTargetIdentities, permissions, allTablesSelection, defaultPrivilegesOwner } = get();
     set({ isLoading: true, error: null });
 
     console.log('[Frontend] generatePreview called');
@@ -390,6 +398,7 @@ const useStore = create<AppState>((set, get) => ({
         objects: objectsForPreview,
         targets: selectedTargetIdentities,
         permissions: permissions,
+        owner: defaultPrivilegesOwner || undefined,
       });
       
       console.log('[Frontend] Received SQL:', sql);
@@ -444,7 +453,7 @@ const useStore = create<AppState>((set, get) => ({
   },
 
   resetModalState: () => {
-    set({ grantOrRevoke: 'grant', permissions: [] });
+    set({ grantOrRevoke: 'grant', permissions: [], defaultPrivilegesOwner: null });
   },
 
   setCurrentPrivileges: (currentPrivileges: any[]) => {

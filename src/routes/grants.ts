@@ -3,6 +3,13 @@ import { getConnectionBySessionId } from './connect';
 import { GrantRequest, ApiResponse } from '../types';
 import { validateBody } from '../utils/validationMiddleware';
 import { GrantRevokeSchema, PreviewGrantRevokeSchema } from '../utils/validationSchemas';
+import {
+  quoteIdentifier,
+  validateIdentityName,
+  validateIdentifier,
+  validatePrivileges,
+  buildSchemaTable
+} from '../utils/sqlUtils';
 
 export const grantsRoutes = Router();
 
@@ -29,98 +36,115 @@ const requireConnection = (req: any, res: any, next: any) => {
 };
 
 const generateGrantSQL = (request: GrantRequest): string[] => {
-  const { users, objects, privileges, action, withGrantOption } = request;
+  const { users, objects, privileges, action, withGrantOption, owner } = request;
   const statements: string[] = [];
-  
+
+  let forUserClause = '';
+  if (owner) {
+    validateIdentityName(owner, 'owner');
+    forUserClause = `FOR USER ${quoteIdentifier(owner)} `;
+  }
+
   if (action === 'grant_role' || action === 'revoke_role') {
-    // For role operations, objects are roles and users are target identities
     for (const user of users) {
+      validateIdentityName(user, 'user');
+      const quotedUser = quoteIdentifier(user);
       for (const role of objects) {
-        const statement = action === 'grant_role' 
-          ? `GRANT ROLE ${role} TO ${user};`
-          : `REVOKE ROLE ${role} FROM ${user};`;
+        validateIdentityName(role, 'role');
+        const quotedRole = quoteIdentifier(role);
+        const statement = action === 'grant_role'
+          ? `GRANT ROLE ${quotedRole} TO ${quotedUser};`
+          : `REVOKE ROLE ${quotedRole} FROM ${quotedUser};`;
         statements.push(statement);
       }
     }
   } else if (action === 'grant_database' || action === 'revoke_database') {
-    // For database operations, no objects - just privileges and users
     for (const user of users) {
-      for (const privilege of privileges) {
+      validateIdentityName(user, 'user');
+      const quotedUser = quoteIdentifier(user);
+      const validPrivs = validatePrivileges(privileges, 'database');
+      for (const privilege of validPrivs) {
         const grantOption = withGrantOption ? ' WITH GRANT OPTION' : '';
         const statement = action === 'grant_database'
-          ? `GRANT ${privilege} ON DATABASE current_database() TO ${user}${grantOption};`
-          : `REVOKE ${privilege} ON DATABASE current_database() FROM ${user};`;
+          ? `GRANT ${privilege} ON DATABASE current_database() TO ${quotedUser}${grantOption};`
+          : `REVOKE ${privilege} ON DATABASE current_database() FROM ${quotedUser};`;
         statements.push(statement);
       }
     }
   } else {
-    // For privilege operations, iterate through privileges
     for (const user of users) {
+      validateIdentityName(user, 'user');
+      const quotedUser = quoteIdentifier(user);
       for (const object of objects) {
-        for (const privilege of privileges) {
-          // Determine object type and format correctly
-          const objectType = object.includes('.') ? 'TABLE' : 'SCHEMA';
+        const objectType = object.includes('.') ? 'TABLE' : 'SCHEMA';
+
+        let quotedObject: string;
+        let schemaName: string;
+        if (object.includes('.')) {
+          const parts = object.split('.');
+          if (parts.length !== 2) {
+            throw new Error(`Invalid object name: expected schema.table format, got "${object}"`);
+          }
+          validateIdentifier(parts[0], 'schema name');
+          validateIdentifier(parts[1], 'table name');
+          quotedObject = buildSchemaTable(parts[0], parts[1]);
+          schemaName = parts[0];
+        } else {
+          validateIdentifier(object, 'object name');
+          quotedObject = quoteIdentifier(object);
+          schemaName = object;
+        }
+
+        const privObjectType = objectType === 'TABLE' ? 'table' : 'schema';
+        const validPrivs = validatePrivileges(privileges, privObjectType);
+        for (const privilege of validPrivs) {
           const grantOption = withGrantOption ? ' WITH GRANT OPTION' : '';
-          
+
           let statement: string;
-          
+
           switch (action) {
-            case 'grant_default':
-              // Generate ALTER DEFAULT PRIVILEGES statements for grant
-              if (objectType === 'SCHEMA') {
-                statement = `ALTER DEFAULT PRIVILEGES IN SCHEMA ${object} GRANT ${privilege} ON TABLES TO ${user}${grantOption};`;
-              } else {
-                // For table objects, use the schema part
-                const schema = object.split('.')[0];
-                statement = `ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} GRANT ${privilege} ON TABLES TO ${user}${grantOption};`;
-              }
+            case 'grant_default': {
+              const quotedSchema = quoteIdentifier(schemaName);
+              statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${quotedSchema} GRANT ${privilege} ON TABLES TO ${quotedUser}${grantOption};`;
               break;
-              
-            case 'revoke_default':
-              // Generate ALTER DEFAULT PRIVILEGES statements for revoke
-              if (objectType === 'SCHEMA') {
-                statement = `ALTER DEFAULT PRIVILEGES IN SCHEMA ${object} REVOKE ${privilege} ON TABLES FROM ${user};`;
-              } else {
-                // For table objects, use the schema part
-                const schema = object.split('.')[0];
-                statement = `ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} REVOKE ${privilege} ON TABLES FROM ${user};`;
-              }
+            }
+
+            case 'revoke_default': {
+              const quotedSchema = quoteIdentifier(schemaName);
+              statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${quotedSchema} REVOKE ${privilege} ON TABLES FROM ${quotedUser};`;
               break;
-              
+            }
+
             case 'grant':
-              // Generate regular GRANT statements
-              statement = objectType === 'SCHEMA' 
-                ? `GRANT ${privilege} ON SCHEMA ${object} TO ${user}${grantOption};`
-                : `GRANT ${privilege} ON TABLE ${object} TO ${user}${grantOption};`;
-              break;
-              
-            case 'revoke':
-              // Generate regular REVOKE statements
               statement = objectType === 'SCHEMA'
-                ? `REVOKE ${privilege} ON SCHEMA ${object} FROM ${user};`
-                : `REVOKE ${privilege} ON TABLE ${object} FROM ${user};`;
+                ? `GRANT ${privilege} ON SCHEMA ${quotedObject} TO ${quotedUser}${grantOption};`
+                : `GRANT ${privilege} ON TABLE ${quotedObject} TO ${quotedUser}${grantOption};`;
               break;
-              
+
+            case 'revoke':
+              statement = objectType === 'SCHEMA'
+                ? `REVOKE ${privilege} ON SCHEMA ${quotedObject} FROM ${quotedUser};`
+                : `REVOKE ${privilege} ON TABLE ${quotedObject} FROM ${quotedUser};`;
+              break;
+
             case 'grant_schema':
-              // Generate schema-level GRANT statements (always on schemas)
-              statement = `GRANT ${privilege} ON SCHEMA ${object} TO ${user}${grantOption};`;
+              statement = `GRANT ${privilege} ON SCHEMA ${quotedObject} TO ${quotedUser}${grantOption};`;
               break;
-              
+
             case 'revoke_schema':
-              // Generate schema-level REVOKE statements (always on schemas)
-              statement = `REVOKE ${privilege} ON SCHEMA ${object} FROM ${user};`;
+              statement = `REVOKE ${privilege} ON SCHEMA ${quotedObject} FROM ${quotedUser};`;
               break;
-              
+
             default:
               throw new Error(`Unknown action: ${action}`);
           }
-          
+
           statements.push(statement);
         }
       }
     }
   }
-  
+
   return statements;
 };
 

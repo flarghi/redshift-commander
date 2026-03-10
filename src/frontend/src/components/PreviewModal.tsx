@@ -17,6 +17,10 @@ import {
   Checkbox,
   Badge,
   Grid,
+  Select,
+  FormControl,
+  FormLabel,
+  FormHelperText,
   useToast,
 } from '@chakra-ui/react';
 import useStore from '../store/store';
@@ -42,10 +46,14 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ isOpen, onClose }) => {
     triggerRefreshPrivileges,
     generatePreview,
     resetModalState,
+    identities,
+    defaultPrivilegesOwner,
+    setDefaultPrivilegesOwner,
   } = useStore();
 
   const toast = useToast();
   const isRoleAction = action === 'role';
+  const isDefaultPrivilegesAction = action === 'default_privileges';
 
   const handleClose = () => {
     resetModalState();
@@ -70,7 +78,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ isOpen, onClose }) => {
         // Handle error silently for now
       });
     }
-  }, [permissions, grantOrRevoke, isOpen, isRoleAction, generatePreview]);
+  }, [permissions, grantOrRevoke, isOpen, isRoleAction, generatePreview, defaultPrivilegesOwner]);
 
   const handleExecute = async () => {
     try {
@@ -132,6 +140,37 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ isOpen, onClose }) => {
                 Revoke
               </Button>
             </ButtonGroup>
+
+            {/* Default Privileges Owner */}
+            {isDefaultPrivilegesAction && (
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="semibold">When objects are created by</FormLabel>
+                <Select
+                  size="sm"
+                  value={defaultPrivilegesOwner?.name || ''}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    if (!name) {
+                      setDefaultPrivilegesOwner(null);
+                    } else {
+                      const identity = identities.find(i => i.name === name);
+                      if (identity) setDefaultPrivilegesOwner(identity);
+                    }
+                  }}
+                  placeholder="Current user (default)"
+                >
+                  {identities
+                    .filter(i => i.type === 'user')
+                    .map(i => (
+                      <option key={i.name} value={i.name}>{i.name}</option>
+                    ))
+                  }
+                </Select>
+                <FormHelperText fontSize="xs">
+                  The user whose future created objects will have these default privileges applied
+                </FormHelperText>
+              </FormControl>
+            )}
 
             {/* Privileges Selection */}
             {!isRoleAction && (

@@ -123,6 +123,7 @@ interface PreviewPayload {
   objects: GrantableObject[];
   targets?: GrantableIdentity[];
   permissions?: Permission[];
+  owner?: GrantableIdentity;
 }
 
 // Generates the SQL preview

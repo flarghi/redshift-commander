@@ -5,7 +5,7 @@ set -euo pipefail
 # Configuration
 DOCKER_HUB_USERNAME="flarghi"
 IMAGE_NAME="redshift-commander"
-TAG="${TAG:-latest}"
+TAG="${TAG:-$(date +%Y%m%d)}"
 FULL_IMAGE_NAME="${DOCKER_HUB_USERNAME}/${IMAGE_NAME}"
 
 echo "🚀 Building and pushing multi-architecture Docker image: ${FULL_IMAGE_NAME}:${TAG}"

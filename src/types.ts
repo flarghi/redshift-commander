@@ -36,6 +36,7 @@ export interface GrantRequest {
   privileges: string[];
   action: 'grant' | 'revoke' | 'grant_default' | 'revoke_default' | 'grant_role' | 'revoke_role' | 'grant_schema' | 'revoke_schema' | 'grant_database' | 'revoke_database';
   withGrantOption?: boolean;
+  owner?: string;
 }
 
 export interface CurrentPermission {

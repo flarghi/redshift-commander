@@ -153,6 +153,90 @@ export function validateIdentifier(identifier: string, name: string = 'identifie
 }
 
 /**
+ * Validates that a string is a safe identity name (user/group/role) according to Redshift rules
+ * Same as isValidIdentifier but allows colons for IAMR/IAM users (e.g., "IAMR:rolename", "IAM:username")
+ */
+export function isValidIdentityName(identifier: string): boolean {
+  if (!identifier || typeof identifier !== 'string') {
+    return false;
+  }
+
+  if (identifier.length === 0 || identifier.length > 127) {
+    return false;
+  }
+
+  const dangerousPatterns = [
+    /--/,
+    /\/\*/,
+    /\*\//,
+    /;/,
+    /\n/,
+    /\r/,
+    /\t/,
+    /\0/,
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(identifier)) {
+      return false;
+    }
+  }
+
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_$:]{0,126}$/;
+  return validPattern.test(identifier);
+}
+
+/**
+ * Validates identity name and throws descriptive error if invalid
+ * Same as validateIdentifier but allows colons for IAMR/IAM users
+ */
+export function validateIdentityName(identifier: string, name: string = 'identity'): void {
+  if (!identifier || typeof identifier !== 'string') {
+    throw new Error(`Invalid ${name}: must be a non-empty string`);
+  }
+
+  if (identifier.trim() !== identifier) {
+    throw new Error(`Invalid ${name}: contains leading or trailing whitespace`);
+  }
+
+  if (identifier.length > 127) {
+    throw new Error(`Invalid ${name}: exceeds maximum length of 127 characters`);
+  }
+
+  if (identifier.includes('--')) {
+    throw new Error(`Invalid ${name}: SQL comments (--) are not allowed`);
+  }
+
+  if (identifier.includes(';')) {
+    throw new Error(`Invalid ${name}: semicolons (;) are not allowed`);
+  }
+
+  if (identifier.includes('/*') || identifier.includes('*/')) {
+    throw new Error(`Invalid ${name}: multi-line comments (/* */) are not allowed`);
+  }
+
+  if (identifier.includes('\n') || identifier.includes('\r')) {
+    throw new Error(`Invalid ${name}: newline characters are not allowed`);
+  }
+
+  if (identifier.includes('\0')) {
+    throw new Error(`Invalid ${name}: null bytes are not allowed`);
+  }
+
+  if (identifier.includes('\t')) {
+    throw new Error(`Invalid ${name}: tab characters are not allowed`);
+  }
+
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_$:]*$/;
+  if (!validPattern.test(identifier)) {
+    throw new Error(
+      `Invalid ${name}: must start with a letter or underscore, ` +
+      `and contain only letters, digits, underscores, dollar signs, and colons`
+    );
+  }
+}
+
+/**
  * Safely formats a list for parameterized IN clause
  * Returns the placeholder string and values array for use with parameterized queries
  * 
@@ -321,15 +405,19 @@ export function buildGrantStatement(
   // Validate inputs
   const validAction = validateAction(action);
   const validPrivileges = validatePrivileges(privileges, objectType);
-  validateIdentifier(identity, 'identity');
-  
+  validateIdentityName(identity, 'identity');
+
   const keyword = validAction === 'GRANT' ? 'TO' : 'FROM';
   const privList = validPrivileges.join(', ');
-  
+
   let objectClause: string;
   if (objectName.includes('.')) {
     // Schema.table format
-    const [schema, table] = objectName.split('.');
+    const parts = objectName.split('.');
+    if (parts.length !== 2) {
+      throw new Error(`Invalid object name: expected schema.table format, got "${objectName}"`);
+    }
+    const [schema, table] = parts;
     objectClause = `ON ${objectType.toUpperCase()} ${buildSchemaTable(schema, table)}`;
   } else {
     // Single identifier

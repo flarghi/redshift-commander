@@ -10,7 +10,6 @@ import {
   Image,
   Badge,
   Button,
-  Select,
   IconButton,
   Divider,
   useColorModeValue,
@@ -61,9 +60,13 @@ function App() {
     };
   }, []);
 
-  const handleActionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setAction(e.target.value as ActionType);
-  };
+  const actionTabs: { value: ActionType; label: string }[] = [
+    { value: 'privileges', label: 'Table Privileges' },
+    { value: 'default_privileges', label: 'Default Privileges' },
+    { value: 'schema_privileges', label: 'Schema Privileges' },
+    { value: 'database_privileges', label: 'Database Privileges' },
+    { value: 'role', label: 'Roles' },
+  ];
 
   if (isLoading && !isConnected) {
     return (
@@ -83,27 +86,6 @@ function App() {
           <HStack justify="space-between" align="center" spacing={4} w="full">
             <HStack spacing={4} flexShrink={0}>
               <Image src={logo} alt="Redshift Commander" h="full" maxH="60px" objectFit="contain" />
-              
-              {/* Left-aligned Mode Selector */}
-              {isConnected && (
-                <HStack spacing={2} bg="mode-selector-bg" px={3} py={1.5} borderRadius="md">
-                  <Text fontSize="md" fontWeight="bold" color="mode-selector-text">Mode</Text>
-                  <Select
-                    value={action} 
-                    onChange={handleActionChange} 
-                    size="md" 
-                    w="220px"
-                    variant="outline"
-                    borderColor="select-border"
-                  >
-                    <option value="privileges">Table Privileges</option>
-                    <option value="default_privileges">Default Privileges</option>
-                    <option value="schema_privileges">Schema Privileges</option>
-                    <option value="database_privileges">Database Privileges</option>
-                    <option value="role">Role</option>
-                  </Select>
-                </HStack>
-              )}
             </HStack>
 
             <HStack spacing={3} flexShrink={0}>
@@ -141,6 +123,32 @@ function App() {
             </HStack>
           </HStack>
         </Box>
+        {isConnected && (
+          <HStack spacing={0} mt={3}>
+            {actionTabs.map((tab) => (
+              <Button
+                key={tab.value}
+                size="sm"
+                variant="unstyled"
+                px={4}
+                py={2}
+                fontSize="sm"
+                fontWeight={action === tab.value ? 'semibold' : 'normal'}
+                color={action === tab.value ? 'tab-active-text' : 'tab-text'}
+                borderBottom="2px solid"
+                borderColor={action === tab.value ? 'tab-active-border' : 'transparent'}
+                borderRadius={0}
+                _hover={{
+                  color: 'tab-hover-text',
+                  borderColor: action === tab.value ? 'tab-active-border' : 'tab-hover-border',
+                }}
+                onClick={() => setAction(tab.value)}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </HStack>
+        )}
         <Divider borderColor="divider" />
         {!isConnected && (
           <Alert status="info" mb={6}>

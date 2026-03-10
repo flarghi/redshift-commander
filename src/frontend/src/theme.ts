@@ -157,14 +157,26 @@ const theme = extendTheme({
         _dark: 'gray.500',
       },
       
-      // Mode selector colors
-      'mode-selector-bg': {
-        default: 'white',
-        _dark: 'gray.900',
+      // Tab bar colors
+      'tab-text': {
+        default: 'gray.500',
+        _dark: 'gray.400',
       },
-      'mode-selector-text': {
+      'tab-hover-text': {
         default: 'gray.700',
         _dark: 'gray.200',
+      },
+      'tab-hover-border': {
+        default: 'gray.300',
+        _dark: 'gray.500',
+      },
+      'tab-active-text': {
+        default: 'blue.600',
+        _dark: 'blue.300',
+      },
+      'tab-active-border': {
+        default: 'blue.600',
+        _dark: 'blue.300',
       },
     },
   },

@@ -57,9 +57,8 @@ const MainInterface: React.FC = () => {
     <>
       <Box position="relative" w="full" h="calc(100vh - 280px)" pb={4}>
         <VStack spacing={3} align="stretch" w="full" p={1} h="full">
-          {/* Full height 3-column grid: Identities (25%) + Objects (25%) + Current Privileges Preview (50%) */}
           <Grid
-            templateColumns="1fr 1fr 2fr"
+            templateColumns={objectsRequired ? '1fr 1fr 2fr' : '1fr 2fr'}
             gap={3}
             h="full"
           >
@@ -67,11 +66,11 @@ const MainInterface: React.FC = () => {
               <IdentitiesSection isTarget={false} />
             </GridItem>
 
-            <GridItem>
-              {objectsRequired ? (
-                isRoleAction ? <IdentitiesSection isTarget={true} /> : <ObjectsSection />
-              ) : null}
-            </GridItem>
+            {objectsRequired && (
+              <GridItem>
+                {isRoleAction ? <IdentitiesSection isTarget={true} /> : <ObjectsSection />}
+              </GridItem>
+            )}
 
             <GridItem>
               <PreviewSection />

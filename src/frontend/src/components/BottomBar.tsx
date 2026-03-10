@@ -4,7 +4,6 @@ import {
   Button,
   Text,
   Badge,
-  VStack,
   Wrap,
   WrapItem,
   Icon,
@@ -33,15 +32,6 @@ const BottomBar: React.FC<BottomBarProps> = ({ onActionClick, isActionDisabled, 
   const isRoleAction = action === 'role';
   const totalSelectedObjects = selectedObjects.length + allTablesSelection.size;
 
-  const getActionLabel = () => {
-    if (action === 'privileges') return 'Table Privileges';
-    if (action === 'default_privileges') return 'Default Privileges';
-    if (action === 'schema_privileges') return 'Schema Privileges';
-    if (action === 'database_privileges') return 'Database Privileges';
-    if (action === 'role') return 'Role Assignment';
-    return action;
-  };
-
   const getRecapText = () => {
     const identityCount = selectedIdentities.length;
     const objectCount = totalSelectedObjects;
@@ -59,6 +49,15 @@ const BottomBar: React.FC<BottomBarProps> = ({ onActionClick, isActionDisabled, 
   };
 
   const hasSelections = selectedIdentities.length > 0 || totalSelectedObjects > 0 || selectedTargetIdentities.length > 0;
+
+  const getButtonLabel = () => {
+    if (action === 'privileges') return 'Manage Table Privileges';
+    if (action === 'default_privileges') return 'Manage Default Privileges';
+    if (action === 'schema_privileges') return 'Manage Schema Privileges';
+    if (action === 'database_privileges') return 'Manage Database Privileges';
+    if (action === 'role') return 'Manage Role Assignments';
+    return 'Grant / Revoke';
+  };
 
   const handleReset = () => {
     resetState();
@@ -98,14 +97,9 @@ const BottomBar: React.FC<BottomBarProps> = ({ onActionClick, isActionDisabled, 
                 />
               </Tooltip>
             )}
-            <VStack spacing={0} align="start" minW={0}>
-              <Text fontSize="sm" fontWeight="semibold" color="text-secondary" isTruncated>
-                {getActionLabel()}
-              </Text>
-              <Text fontSize="xs" color="text-muted" isTruncated>
-                {getRecapText()}
-              </Text>
-            </VStack>
+            <Text fontSize="sm" color="text-secondary" isTruncated>
+              {getRecapText()}
+            </Text>
             
             {/* Quick badges for selections */}
             <Wrap spacing={1} align="center">
@@ -147,7 +141,7 @@ const BottomBar: React.FC<BottomBarProps> = ({ onActionClick, isActionDisabled, 
           rightIcon={<Icon as={ChevronRightIcon} />}
           flexShrink={0}
         >
-          Grant / Revoke
+          {getButtonLabel()}
         </Button>
       </HStack>
     </Box>

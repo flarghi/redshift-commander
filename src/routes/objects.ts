@@ -157,7 +157,7 @@ objectsRoutes.get('/schemas-only', requireConnection, async (req, res) => {
       WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
         AND database_name = current_database()
       ORDER BY schema_name
-      LIMIT 100
+      LIMIT 1000
     `;
     
     const result = await client.query(query);

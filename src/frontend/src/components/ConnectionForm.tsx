@@ -14,6 +14,9 @@ import {
   Alert,
   AlertIcon,
   Spinner,
+  Switch,
+  Text,
+  Tooltip,
 } from '@chakra-ui/react';
 import type { RedshiftConnection } from '../types';
 import useStore from '../store/store';
@@ -26,6 +29,7 @@ const ConnectionForm: React.FC = () => {
     database: 'dev',
     username: '',
     password: '',
+    ssl: true,
   });
 
   const handleInputChange = (field: keyof RedshiftConnection) => (
@@ -33,6 +37,10 @@ const ConnectionForm: React.FC = () => {
   ) => {
     const value = field === 'port' ? parseInt(e.target.value) || 5439 : e.target.value;
     setFormData((prev: RedshiftConnection) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSslToggle = () => {
+    setFormData((prev: RedshiftConnection) => ({ ...prev, ssl: !prev.ssl }));
   };
 
   const handleConnect = async () => {
@@ -102,10 +110,38 @@ const ConnectionForm: React.FC = () => {
               />
             </FormControl>
 
+            <FormControl display="flex" alignItems="center">
+              <FormLabel color="text-secondary" mb="0">
+                SSL Verification
+              </FormLabel>
+              <Tooltip 
+                label="Disable for reverse proxies or load balancers with self-signed certificates"
+                placement="top"
+              >
+                <Box>
+                  <Switch
+                    isChecked={formData.ssl}
+                    onChange={handleSslToggle}
+                    colorScheme="green"
+                  />
+                </Box>
+              </Tooltip>
+              <Text ml={2} fontSize="sm" color={formData.ssl ? "green.500" : "orange.500"}>
+                {formData.ssl ? 'Enabled' : 'Disabled'}
+              </Text>
+            </FormControl>
+
             {connectionError && (
               <Alert status="error">
                 <AlertIcon />
                 {connectionError}
+              </Alert>
+            )}
+
+            {!formData.ssl && (
+              <Alert status="warning" fontSize="sm">
+                <AlertIcon />
+                SSL verification disabled. Only use this for trusted internal networks.
               </Alert>
             )}
 

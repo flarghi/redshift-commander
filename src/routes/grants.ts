@@ -3,19 +3,12 @@ import { getConnectionBySessionId } from './connect';
 import { GrantRequest, ApiResponse } from '../types';
 import { validateBody } from '../utils/validationMiddleware';
 import { GrantRevokeSchema, PreviewGrantRevokeSchema } from '../utils/validationSchemas';
-import {
-  quoteIdentifier,
-  validateIdentityName,
-  validateIdentifier,
-  validatePrivileges,
-  buildSchemaTable
-} from '../utils/sqlUtils';
 
 export const grantsRoutes = Router();
 
 const requireConnection = (req: any, res: any, next: any) => {
   const sessionId = req.query.sessionId || req.body.sessionId;
-  
+
   if (!sessionId) {
     return res.status(400).json({
       success: false,
@@ -39,100 +32,85 @@ const generateGrantSQL = (request: GrantRequest): string[] => {
   const { users, objects, privileges, action, withGrantOption, owner } = request;
   const statements: string[] = [];
 
-  let forUserClause = '';
-  if (owner) {
-    validateIdentityName(owner, 'owner');
-    forUserClause = `FOR USER ${quoteIdentifier(owner)} `;
-  }
+  const forUserClause = owner ? `FOR USER ${owner} ` : '';
 
   if (action === 'grant_role' || action === 'revoke_role') {
+    // For role operations, objects are roles and users are target identities
     for (const user of users) {
-      validateIdentityName(user, 'user');
-      const quotedUser = quoteIdentifier(user);
       for (const role of objects) {
-        validateIdentityName(role, 'role');
-        const quotedRole = quoteIdentifier(role);
         const statement = action === 'grant_role'
-          ? `GRANT ROLE ${quotedRole} TO ${quotedUser};`
-          : `REVOKE ROLE ${quotedRole} FROM ${quotedUser};`;
+          ? `GRANT ROLE ${role} TO ${user};`
+          : `REVOKE ROLE ${role} FROM ${user};`;
         statements.push(statement);
       }
     }
   } else if (action === 'grant_database' || action === 'revoke_database') {
+    // For database operations, no objects - just privileges and users
     for (const user of users) {
-      validateIdentityName(user, 'user');
-      const quotedUser = quoteIdentifier(user);
-      const validPrivs = validatePrivileges(privileges, 'database');
-      for (const privilege of validPrivs) {
+      for (const privilege of privileges) {
         const grantOption = withGrantOption ? ' WITH GRANT OPTION' : '';
         const statement = action === 'grant_database'
-          ? `GRANT ${privilege} ON DATABASE current_database() TO ${quotedUser}${grantOption};`
-          : `REVOKE ${privilege} ON DATABASE current_database() FROM ${quotedUser};`;
+          ? `GRANT ${privilege} ON DATABASE current_database() TO ${user}${grantOption};`
+          : `REVOKE ${privilege} ON DATABASE current_database() FROM ${user};`;
         statements.push(statement);
       }
     }
   } else {
+    // For privilege operations, iterate through privileges
     for (const user of users) {
-      validateIdentityName(user, 'user');
-      const quotedUser = quoteIdentifier(user);
       for (const object of objects) {
-        const objectType = object.includes('.') ? 'TABLE' : 'SCHEMA';
-
-        let quotedObject: string;
-        let schemaName: string;
-        if (object.includes('.')) {
-          const parts = object.split('.');
-          if (parts.length !== 2) {
-            throw new Error(`Invalid object name: expected schema.table format, got "${object}"`);
-          }
-          validateIdentifier(parts[0], 'schema name');
-          validateIdentifier(parts[1], 'table name');
-          quotedObject = buildSchemaTable(parts[0], parts[1]);
-          schemaName = parts[0];
-        } else {
-          validateIdentifier(object, 'object name');
-          quotedObject = quoteIdentifier(object);
-          schemaName = object;
-        }
-
-        const privObjectType = objectType === 'TABLE' ? 'table' : 'schema';
-        const validPrivs = validatePrivileges(privileges, privObjectType);
-        for (const privilege of validPrivs) {
+        for (const privilege of privileges) {
+          // Determine object type and format correctly
+          const objectType = object.includes('.') ? 'TABLE' : 'SCHEMA';
           const grantOption = withGrantOption ? ' WITH GRANT OPTION' : '';
 
           let statement: string;
 
           switch (action) {
-            case 'grant_default': {
-              const quotedSchema = quoteIdentifier(schemaName);
-              statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${quotedSchema} GRANT ${privilege} ON TABLES TO ${quotedUser}${grantOption};`;
+            case 'grant_default':
+              // Generate ALTER DEFAULT PRIVILEGES statements for grant
+              if (objectType === 'SCHEMA') {
+                statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${object} GRANT ${privilege} ON TABLES TO ${user}${grantOption};`;
+              } else {
+                // For table objects, use the schema part
+                const schema = object.split('.')[0];
+                statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${schema} GRANT ${privilege} ON TABLES TO ${user}${grantOption};`;
+              }
               break;
-            }
 
-            case 'revoke_default': {
-              const quotedSchema = quoteIdentifier(schemaName);
-              statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${quotedSchema} REVOKE ${privilege} ON TABLES FROM ${quotedUser};`;
+            case 'revoke_default':
+              // Generate ALTER DEFAULT PRIVILEGES statements for revoke
+              if (objectType === 'SCHEMA') {
+                statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${object} REVOKE ${privilege} ON TABLES FROM ${user};`;
+              } else {
+                // For table objects, use the schema part
+                const schema = object.split('.')[0];
+                statement = `ALTER DEFAULT PRIVILEGES ${forUserClause}IN SCHEMA ${schema} REVOKE ${privilege} ON TABLES FROM ${user};`;
+              }
               break;
-            }
 
             case 'grant':
+              // Generate regular GRANT statements
               statement = objectType === 'SCHEMA'
-                ? `GRANT ${privilege} ON SCHEMA ${quotedObject} TO ${quotedUser}${grantOption};`
-                : `GRANT ${privilege} ON TABLE ${quotedObject} TO ${quotedUser}${grantOption};`;
+                ? `GRANT ${privilege} ON SCHEMA ${object} TO ${user}${grantOption};`
+                : `GRANT ${privilege} ON TABLE ${object} TO ${user}${grantOption};`;
               break;
 
             case 'revoke':
+              // Generate regular REVOKE statements
               statement = objectType === 'SCHEMA'
-                ? `REVOKE ${privilege} ON SCHEMA ${quotedObject} FROM ${quotedUser};`
-                : `REVOKE ${privilege} ON TABLE ${quotedObject} FROM ${quotedUser};`;
+                ? `REVOKE ${privilege} ON SCHEMA ${object} FROM ${user};`
+                : `REVOKE ${privilege} ON TABLE ${object} FROM ${user};`;
               break;
 
             case 'grant_schema':
-              statement = `GRANT ${privilege} ON SCHEMA ${quotedObject} TO ${quotedUser}${grantOption};`;
+              // Generate schema-level GRANT statements (always on schemas)
+              statement = `GRANT ${privilege} ON SCHEMA ${object} TO ${user}${grantOption};`;
               break;
 
             case 'revoke_schema':
-              statement = `REVOKE ${privilege} ON SCHEMA ${quotedObject} FROM ${quotedUser};`;
+              // Generate schema-level REVOKE statements (always on schemas)
+              statement = `REVOKE ${privilege} ON SCHEMA ${object} FROM ${user};`;
               break;
 
             default:
@@ -153,7 +131,7 @@ grantsRoutes.post('/preview', validateBody(PreviewGrantRevokeSchema), requireCon
     // Request body is now validated and typed by Zod
     const request: GrantRequest = req.body;
     const statements = generateGrantSQL(request);
-    
+
     const response: ApiResponse = {
       success: true,
       data: { statements }
@@ -173,17 +151,17 @@ grantsRoutes.post('/execute', validateBody(GrantRevokeSchema), requireConnection
     // Request body is now validated and typed by Zod
     const request: GrantRequest = req.body;
     console.log('Grant request received:', request);
-    
+
     const statements = generateGrantSQL(request);
     console.log('Generated SQL statements:', statements);
-    
+
     const client = await (req as any).connection.connect();
     const results: string[] = [];
     const errors: string[] = [];
-    
+
     try {
       await client.query('BEGIN');
-      
+
       for (const statement of statements) {
         try {
           console.log(`Executing: ${statement}`);
@@ -196,7 +174,7 @@ grantsRoutes.post('/execute', validateBody(GrantRevokeSchema), requireConnection
           errors.push(`✗ ${statement} - ${errorMsg}`);
         }
       }
-      
+
       if (errors.length > 0) {
         await client.query('ROLLBACK');
         const response: ApiResponse = {
@@ -209,9 +187,9 @@ grantsRoutes.post('/execute', validateBody(GrantRevokeSchema), requireConnection
         await client.query('COMMIT');
         const response: ApiResponse = {
           success: true,
-          data: { 
+          data: {
             message: `Successfully executed ${results.length} statements`,
-            results 
+            results
           }
         };
         res.json(response);

@@ -47,42 +47,6 @@ const redshiftIdentifier = z.string()
   );
 
 /**
- * Custom Zod validator for Redshift identity names (users, groups, roles)
- * Same dangerous-pattern blocking as redshiftIdentifier but allows colons for IAMR/IAM users
- */
-const redshiftIdentityName = z.string()
-  .min(1, 'Identity name cannot be empty')
-  .max(127, 'Identity name cannot exceed 127 characters')
-  .refine(
-    (val) => !val.includes('--'),
-    { message: 'SQL comments (--) are not allowed' }
-  )
-  .refine(
-    (val) => !val.includes(';'),
-    { message: 'Semicolons (;) are not allowed' }
-  )
-  .refine(
-    (val) => !val.includes('/*') && !val.includes('*/'),
-    { message: 'Multi-line comments (/* */) are not allowed' }
-  )
-  .refine(
-    (val) => !val.includes('\n') && !val.includes('\r'),
-    { message: 'Newline characters are not allowed' }
-  )
-  .refine(
-    (val) => !val.includes('\t'),
-    { message: 'Tab characters are not allowed' }
-  )
-  .refine(
-    (val) => !val.includes('\0'),
-    { message: 'Null bytes are not allowed' }
-  )
-  .refine(
-    (val) => /^[a-zA-Z_][a-zA-Z0-9_$:]*$/.test(val),
-    { message: 'Identity name must start with a letter or underscore, and contain only letters, digits, underscores, dollar signs, and colons' }
-  );
-
-/**
  * Session ID validation
  * Must be a non-empty string (64-character hex for our implementation)
  */
@@ -142,7 +106,7 @@ export type CreateUserRequest = z.infer<typeof CreateUserSchema>;
  */
 export const CreateGroupSchema = z.object({
   groupname: redshiftIdentifier.describe('group name'),
-  users: z.array(redshiftIdentityName).default([]),
+  users: z.array(redshiftIdentifier).default([]),
   sessionId: sessionId
 });
 
@@ -172,7 +136,7 @@ const privilegeValue = z.string()
  * Identity Schema (for permissions)
  */
 const identitySchema = z.object({
-  name: redshiftIdentityName,
+  name: redshiftIdentifier,
   type: z.enum(['user', 'group', 'role']).optional()
 });
 
@@ -222,7 +186,7 @@ export type PreviewGrantRevokeRequest = z.infer<typeof PreviewGrantRevokeSchema>
  * Get Permissions Schema
  */
 export const GetPermissionsSchema = z.object({
-  identity: redshiftIdentityName,
+  identity: redshiftIdentifier,
   objectType: z.enum(['schema', 'table', 'view', 'function', 'database', 'role']),
   objectName: redshiftIdentifier.optional(),
   schema: redshiftIdentifier.optional(),

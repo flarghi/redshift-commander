@@ -5,7 +5,6 @@ import {
   quoteIdentifier,
   buildInClause,
   validateIdentifier,
-  validateIdentityName,
   buildSchemaTable,
   validatePrivileges,
   validateAction
@@ -64,7 +63,7 @@ previewRoutes.get('/permissions/:identityName/:objectType/:schemaName/:objectNam
     const trimmedObjectName = objectName ? objectName.trim() : objectName;
     
     // Validate identifiers to prevent SQL injection
-    validateIdentityName(trimmedIdentityName, 'identity name');
+    validateIdentifier(trimmedIdentityName, 'identity name');
     validateIdentifier(trimmedSchemaName, 'schema name');
     if (trimmedObjectName) {
       validateIdentifier(trimmedObjectName, 'object name');
@@ -200,7 +199,7 @@ previewRoutes.get('/permissions-summary/:identityName', requireConnection, async
     const trimmedIdentityName = identityName.trim();
     
     // Validate identifier to prevent SQL injection
-    validateIdentityName(trimmedIdentityName, 'identity name');
+    validateIdentifier(trimmedIdentityName, 'identity name');
 
     console.log(`SHOW GRANTS summary for identity: ${trimmedIdentityName}`);
     
@@ -549,7 +548,7 @@ previewRoutes.post('/permissions-filtered', validateBody(PermissionsFilteredSche
       // For non-default and non-role privileges, use SHOW GRANTS for each identity
       for (const identity of identities) {
         const trimmedIdentityName = identity.name.trim();
-        validateIdentityName(trimmedIdentityName, 'identity name');
+        validateIdentifier(trimmedIdentityName, 'identity name');
         const quotedIdentityForGrants = quoteIdentifier(trimmedIdentityName);
         // Add ROLE keyword for role identities
         const identityForQuery = identity.type === 'role' ? `ROLE ${quotedIdentityForGrants}` : quotedIdentityForGrants;
@@ -853,7 +852,6 @@ previewRoutes.post('/:action', validateBody(PreviewActionSchema), requireConnect
     const errorMessage = error instanceof Error ? error.message : 'Failed to generate SQL preview';
     const isValidationError = errorMessage.includes('privilege') ||
                               errorMessage.includes('Invalid identifier') ||
-                              errorMessage.includes('Invalid identity') ||
                               errorMessage.includes('must be specified');
     
     const response: ApiResponse = {
@@ -870,7 +868,7 @@ function generateGrantSQL(identities: any[], objects: any[], permissions: any[])
   
   identities.forEach(identity => {
     // Validate identity name
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     objects.forEach(object => {
@@ -909,7 +907,7 @@ function generateRevokeSQL(identities: any[], objects: any[], permissions: any[]
   
   identities.forEach(identity => {
     // Validate identity name
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     objects.forEach(object => {
@@ -948,12 +946,12 @@ function generateGrantDefaultSQL(identities: any[], objects: any[], permissions:
 
   let forUserClause = '';
   if (owner?.name) {
-    validateIdentityName(owner.name, 'owner name');
+    validateIdentifier(owner.name, 'owner name');
     forUserClause = `FOR USER ${quoteIdentifier(owner.name)} `;
   }
 
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
 
     objects.forEach(object => {
@@ -976,12 +974,12 @@ function generateRevokeDefaultSQL(identities: any[], objects: any[], permissions
 
   let forUserClause = '';
   if (owner?.name) {
-    validateIdentityName(owner.name, 'owner name');
+    validateIdentifier(owner.name, 'owner name');
     forUserClause = `FOR USER ${quoteIdentifier(owner.name)} `;
   }
 
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
 
     objects.forEach(object => {
@@ -1003,7 +1001,7 @@ function generateGrantSchemaSQL(identities: any[], objects: any[], permissions: 
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     objects.forEach(object => {
@@ -1025,7 +1023,7 @@ function generateRevokeSchemaSQL(identities: any[], objects: any[], permissions:
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     objects.forEach(object => {
@@ -1047,7 +1045,7 @@ function generateGrantDatabaseSQL(identities: any[], permissions: any[], databas
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     const privValues = permissions.map((p: any) => p.value);
@@ -1066,7 +1064,7 @@ function generateRevokeDatabaseSQL(identities: any[], permissions: any[], databa
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     const privValues = permissions.map((p: any) => p.value);
@@ -1085,11 +1083,11 @@ function generateGrantRoleSQL(identities: any[], targets: any[]): string {
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     targets.forEach(target => {
-      validateIdentityName(target.name, 'target role name');
+      validateIdentifier(target.name, 'target role name');
       const quotedTarget = quoteIdentifier(target.name);
       
       // Add ROLE keyword before target role name and identity if it's a role
@@ -1106,11 +1104,11 @@ function generateRevokeRoleSQL(identities: any[], targets: any[]): string {
   const statements: string[] = [];
   
   identities.forEach(identity => {
-    validateIdentityName(identity.name, 'identity name');
+    validateIdentifier(identity.name, 'identity name');
     const quotedIdentity = quoteIdentifier(identity.name);
     
     targets.forEach(target => {
-      validateIdentityName(target.name, 'target role name');
+      validateIdentifier(target.name, 'target role name');
       const quotedTarget = quoteIdentifier(target.name);
       
       // Add ROLE keyword before target role name and identity if it's a role

@@ -373,14 +373,13 @@ const useStore = create<AppState>((set, get) => ({
 
     try {
       // Create objects array that includes ALL tables markers
-      let objectsForPreview = [...selectedObjects];
+      const objectsForPreview = [...selectedObjects];
       
       // Add special ALL tables markers for schemas with ALL tables selected
       allTablesSelection.forEach(schemaName => {
         objectsForPreview.push({
           name: schemaName,
           type: 'schema',
-          schema: schemaName,
           isAllTables: true // Special marker for ALL tables in schema
         } as GrantableObject);
       });

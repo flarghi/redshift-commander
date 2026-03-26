@@ -13,6 +13,7 @@ export interface DatabaseObject {
   schema?: string;
   database?: string;
   children?: DatabaseObject[];
+  isAllTables?: boolean;
 }
 
 export interface User {

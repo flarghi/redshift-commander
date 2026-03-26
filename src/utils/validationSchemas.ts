@@ -146,7 +146,8 @@ const identitySchema = z.object({
 const databaseObjectSchema = z.object({
   name: redshiftIdentifier,
   type: z.enum(['schema', 'table', 'view', 'function', 'procedure', 'database', 'role']),
-  schema: redshiftIdentifier.optional()
+  schema: redshiftIdentifier.optional(),
+  isAllTables: z.boolean().optional()
 });
 
 /**
